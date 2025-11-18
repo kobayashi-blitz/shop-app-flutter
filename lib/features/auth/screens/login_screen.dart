@@ -12,13 +12,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _loginIdController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _loginIdController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -26,7 +26,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       final success = await ref.read(authProvider.notifier).login(
-            _emailController.text.trim(),
+            _loginIdController.text.trim(),
             _passwordController.text,
           );
 
@@ -54,7 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Icon(
-                    Icons.local_shipping,
+                    Icons.wheelchair_pickup,
                     size: 80,
                     color: Colors.blue,
                   ),
@@ -78,16 +78,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
                   TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _loginIdController,
+                    keyboardType: TextInputType.text,
                     decoration: const InputDecoration(
-                      labelText: 'ログインID / メールアドレス',
-                      prefixIcon: Icon(Icons.email),
+                      labelText: 'ログインID',
+                      prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'ログインID / メールアドレスを入力してください';
+                        return 'ログインIDを入力してください';
                       }
                       return null;
                     },

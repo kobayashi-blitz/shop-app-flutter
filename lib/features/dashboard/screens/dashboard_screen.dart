@@ -113,8 +113,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        dashboardState.data?.user.officeName ?? 
-                                        authState.user?.officeName ?? '',
+                                        dashboardState.data?.user.officeName ?? '',
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -122,7 +121,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${dashboardState.data?.user.name ?? authState.user?.name ?? ''} さん',
+                                        '${dashboardState.data?.user.name ?? ''} さん',
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -162,6 +161,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           color: Colors.green,
                           onTap: () => _navigateToPlaceholder('配送完了'),
                         ),
+
+                        const SizedBox(height: 24),
+                        const Text(
+                          '商品管理',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+                        Card(
+                          child: InkWell(
+                            onTap: () => _navigateToPlaceholder('在庫検索'),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.deepOrange.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.search, color: Colors.deepOrange, size: 32),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  const Expanded(
+                                    child: Text(
+                                      '在庫検索',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+
                         const SizedBox(height: 24),
                         const Text(
                           '利用状況',
@@ -170,15 +214,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        _buildMetricCard(
-                          title: '長期デモ商品件数',
-                          value: '${dashboardState.data?.usage.longTermDemoCount ?? 0}',
-                          unit: '件',
-                          icon: Icons.inventory,
-                          color: Colors.purple,
-                          onTap: () => _navigateToPlaceholder('長期デモ商品'),
+
+                        const SizedBox(height: 8),
+                        Card(
+                          child: InkWell(
+                            onTap: () => _navigateToPlaceholder('在庫検索'),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.brown.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.content_paste_search, color: Colors.brown, size: 32),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  const Expanded(
+                                    child: Text(
+                                      '伝票照会',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
+
+                        const SizedBox(height: 8),
+                        _buildMetricCard(
+                          title: '当月新規受注件数',
+                          value: '${dashboardState.data?.usage.newOrdersThisMonthCount ?? 0}',
+                          unit: '件',
+                          icon: Icons.add_shopping_cart,
+                          color: Colors.indigo,
+                          onTap: () => _navigateToPlaceholder('当月新規受注'),
+                        ),
+
                         const SizedBox(height: 8),
                         _buildMetricCard(
                           title: '入院保留件数',
@@ -188,6 +268,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           color: Colors.amber,
                           onTap: () => _navigateToPlaceholder('入院保留'),
                         ),
+
+                        const SizedBox(height: 12),
+                        _buildMetricCard(
+                          title: '長期デモ商品件数',
+                          value: '${dashboardState.data?.usage.longTermDemoCount ?? 0}',
+                          unit: '件',
+                          icon: Icons.inventory,
+                          color: Colors.purple,
+                          onTap: () => _navigateToPlaceholder('長期デモ商品'),
+                        ),
+
                         const SizedBox(height: 8),
                         _buildMetricCard(
                           title: '契約利用者数',
@@ -208,24 +299,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                         const SizedBox(height: 8),
                         _buildMetricCard(
-                          title: 'レンタル売上（当月）',
+                          title: 'レンタル売上（累計）',
                           value: _formatCurrency(
                             dashboardState.data?.usage.rentalSalesAmountMonth ?? 0,
                           ),
                           unit: '',
-                          icon: Icons.attach_money,
+                          icon: Icons.currency_yen,
                           color: Colors.green,
                           onTap: null,
                         ),
-                        const SizedBox(height: 8),
-                        _buildMetricCard(
-                          title: '当月新規受注件数',
-                          value: '${dashboardState.data?.usage.newOrdersThisMonthCount ?? 0}',
-                          unit: '件',
-                          icon: Icons.add_shopping_cart,
-                          color: Colors.indigo,
-                          onTap: () => _navigateToPlaceholder('当月新規受注'),
-                        ),
+
                       ],
                     ),
                   ),
