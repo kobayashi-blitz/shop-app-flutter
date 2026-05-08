@@ -27,7 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final success = await ref.read(authProvider.notifier).login(
             _loginIdController.text.trim(),
-            _passwordController.text,
+            _passwordController.text.trim(),
           );
 
       if (success && mounted) {
@@ -60,7 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    '介護ショップ担当者',
+                    'アプリタイトル',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -69,7 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'スマホアプリ',
+                    'primeeからid,passを設定します',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 20,
@@ -85,12 +85,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'ログインIDを入力してください';
-                      }
-                      return null;
-                    },
                     enabled: !authState.isLoading,
                   ),
                   const SizedBox(height: 16),
@@ -114,12 +108,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       border: const OutlineInputBorder(),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'パスワードを入力してください';
-                      }
-                      return null;
-                    },
                     enabled: !authState.isLoading,
                   ),
                   const SizedBox(height: 24),

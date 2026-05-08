@@ -2,10 +2,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../models/dashboard_data.dart';
 import 'dashboard_service.dart';
+import 'riyojokyo_service.dart';
 
 final dashboardServiceProvider = Provider<DashboardService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return DashboardService(apiClient);
+});
+
+final riyojokyoServiceProvider = Provider<RiyojokyoService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return RiyojokyoService(apiClient);
 });
 
 class DashboardState {
@@ -34,40 +40,69 @@ class DashboardState {
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
   final DashboardService _dashboardService;
+  final Ref _ref;
 
-  DashboardNotifier(this._dashboardService) : super(DashboardState());
+  DashboardNotifier(this._dashboardService, this._ref)
+      : super(DashboardState());
 
   Future<void> loadDashboard() async {
     // ローディング開始
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 疑似的な通信待ち時間（ローディング感を出すため）
-      await Future.delayed(const Duration(milliseconds: 500));
+      // ★ ログインユーザー情報を Auth から取得
+      final authState = _ref.read(authProvider);
+      final loginUser = authState.user;
 
-      // ★ ダッシュボードのモックデータ
-      final mockData = DashboardData(
+      // shopId は既に int 型として保持されている（null の場合はエラー扱い）
+      final parsedShopId = loginUser?.shopId;
+      print('### [DashboardNotifier] parsedShopId = $parsedShopId');
+      if (parsedShopId == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'ログイン情報に代理店IDがありません。',
+        );
+        return;
+      }
+
+      // 配送件数（明日／本日完了）取得
+      final deliveryInfo =
+          await _dashboardService.fetchDeliveryInfo(shopId: parsedShopId);
+
+      // 利用状況を pcw 側 RiyojokyoApi から並列取得
+      final tantoId = loginUser?.shopSyainId ?? 0;
+      final riyo = _ref.read(riyojokyoServiceProvider);
+      final results = await Future.wait<int>([
+        riyo.togetuSinkiOrderCount(shopId: parsedShopId, tantoId: tantoId),
+        riyo.nyuinHoryuSyohinCount(shopId: parsedShopId, tantoId: tantoId),
+        riyo.keiyakutyuRiyosyaCount(shopId: parsedShopId, tantoId: tantoId),
+        riyo.rentalUriageTotal(shopId: parsedShopId, tantoId: tantoId),
+        riyo.moreOneMonthDemoCount(shopId: parsedShopId, tantoId: tantoId),
+        riyo.rentalSyohinCount(shopId: parsedShopId, tantoId: tantoId),
+      ]);
+
+      final dashboardData = DashboardData(
         user: UserInfo(
-          name: '山田 太郎',
-          officeName: '〇〇介護サービス',
+          shopId: parsedShopId,
+          shopSyainName: loginUser?.shopSyainName ?? '',
+          name: loginUser?.shopSyainName ?? '',
+          officeName: loginUser?.shopName ?? '',
+          shopName: loginUser?.shopName ?? '',
         ),
-        delivery: DeliveryInfo(
-          tomorrowScheduledCount: 12,
-          completedTodayCount: 8,
-        ),
+        delivery: deliveryInfo,
         usage: UsageInfo(
-          longTermDemoCount: 5,
-          hospitalOnHoldCount: 3,
-          contractUserCount: 120,
-          rentalInUseCount: 340,
-          rentalSalesAmountMonth: 1234567,
-          newOrdersThisMonthCount: 18,
+          newOrdersThisMonthCount: results[0],
+          hospitalOnHoldCount: results[1],
+          contractUserCount: results[2],
+          rentalSalesAmountMonth: results[3],
+          oneMonthDemoCount: results[4],
+          rentalInUseCount: results[5],
         ),
       );
 
       // 状態更新（ローディング終了＋データ反映）
       state = state.copyWith(
-        data: mockData,
+        data: dashboardData,
         isLoading: false,
         error: null,
       );
@@ -85,7 +120,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   }
 }
 
-final dashboardProvider = StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
+final dashboardProvider =
+    StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
   final dashboardService = ref.watch(dashboardServiceProvider);
-  return DashboardNotifier(dashboardService);
+  return DashboardNotifier(dashboardService, ref);
 });

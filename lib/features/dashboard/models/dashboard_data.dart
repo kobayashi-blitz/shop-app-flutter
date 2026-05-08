@@ -21,16 +21,28 @@ class DashboardData {
 class UserInfo {
   final String name;
   final String officeName;
+  // 代理店名
+  final String shopName;
+  // 代理店ID
+  final int? shopId;
+  // 担当者名（ログインユーザー名）
+  final String? shopSyainName;
 
   UserInfo({
     required this.name,
     required this.officeName,
+    required this.shopName,
+    this.shopId,
+    this.shopSyainName,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(
-      name: json['name'] as String,
-      officeName: json['office_name'] as String,
+      name: json['name'] as String? ?? '',
+      officeName: json['office_name'] as String? ?? '',
+      shopName: json['shop_name'] as String? ?? '',
+      shopId: json['shop_id'] as int?,
+      shopSyainName: json['shop_syain_name'] as String?,
     );
   }
 }
@@ -53,25 +65,24 @@ class DeliveryInfo {
 }
 
 class UsageInfo {
-  final int longTermDemoCount;
   final int hospitalOnHoldCount;
   final int contractUserCount;
   final int rentalInUseCount;
   final int rentalSalesAmountMonth;
   final int newOrdersThisMonthCount;
+  final int oneMonthDemoCount;
 
   UsageInfo({
-    required this.longTermDemoCount,
     required this.hospitalOnHoldCount,
     required this.contractUserCount,
     required this.rentalInUseCount,
     required this.rentalSalesAmountMonth,
     required this.newOrdersThisMonthCount,
+    this.oneMonthDemoCount = 0,
   });
 
   factory UsageInfo.fromJson(Map<String, dynamic> json) {
     return UsageInfo(
-      longTermDemoCount: json['long_term_demo_count'] as int,
       hospitalOnHoldCount: json['hospital_on_hold_count'] as int,
       contractUserCount: json['contract_user_count'] as int,
       rentalInUseCount: json['rental_in_use_count'] as int,
