@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
@@ -19,6 +20,15 @@ class MyApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ja', 'JP'),
+      ],
+      locale: const Locale('ja', 'JP'),
       home: const AuthWrapper(),
       routes: {
         '/login': (context) => const LoginScreen(),
@@ -45,16 +55,15 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   }
 
   Future<void> _checkAuthStatus() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final authService = ref.read(authServiceProvider);
-    final isLoggedIn = await authService.isLoggedIn();
-    
+    await ref.read(authProvider.notifier).initialized;
+    final user = ref.read(authProvider).user;
+
     if (mounted) {
       setState(() {
         _isChecking = false;
       });
-      
-      if (isLoggedIn) {
+
+      if (user != null) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
         );

@@ -38,9 +38,10 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  late final Future<void> initialized;
 
   AuthNotifier(this._authService) : super(AuthState()) {
-    _checkAuthStatus();
+    initialized = _checkAuthStatus();
   }
 
   Future<void> _checkAuthStatus() async {
