@@ -23,9 +23,11 @@ class _TomorrowDeliveryListScreenState
   @override
   void initState() {
     super.initState();
-    // 初回ロード
+    // 初回ロード（widget.targetDate を Provider に渡して対象日を単一ソース化）
     Future.microtask(() {
-      ref.read(tomorrowDeliveryProvider.notifier).load();
+      ref
+          .read(tomorrowDeliveryProvider.notifier)
+          .load(targetDate: widget.targetDate);
     });
   }
 
@@ -44,7 +46,9 @@ class _TomorrowDeliveryListScreenState
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await ref.read(tomorrowDeliveryProvider.notifier).load();
+          await ref
+              .read(tomorrowDeliveryProvider.notifier)
+              .load(targetDate: widget.targetDate);
         },
         child: _buildBody(state),
       ),

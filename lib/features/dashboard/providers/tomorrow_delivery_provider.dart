@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/tomorrow_delivery_item.dart';
 import '../providers/tomorrow_delivery_service.dart';
@@ -36,11 +35,13 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
   TomorrowDeliveryNotifier(this._service, this._ref)
       : super(TomorrowDeliveryState());
 
-  Future<void> load() async {
+  /// [targetDate] は呼出元 (画面) で確定済みの対象日。17 時切替ロジックの単一ソース化のため、
+  /// 内部で `DateTime.now()` を見ない（境界跨ぎで画面タイトルと API フィルタがズレないように）。
+  Future<void> load({required DateTime targetDate}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // ログイン情報から shopId を取得
+      // ログイン情報から shopId / tantoId(shopSyainId) / shopSyainName を取得
       final authState = _ref.read(authProvider);
       final loginUser = authState.user;
       final shopId = loginUser?.shopId;
@@ -53,7 +54,15 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
         return;
       }
 
-      final items = await _service.fetchTomorrowList(shopId: shopId);
+      final tantoId = loginUser?.shopSyainId ?? 0;
+      final fallbackName = loginUser?.shopSyainName ?? '';
+
+      final items = await _service.fetchTomorrowList(
+        shopId: shopId,
+        tantoId: tantoId,
+        targetDate: targetDate,
+        haisouTantoNameFallback: fallbackName,
+      );
 
       state = state.copyWith(
         isLoading: false,
@@ -63,15 +72,17 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: '翌日配送予定の取得に失敗しました',
+        error: e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : '配送予定の取得に失敗しました',
       );
     }
   }
 }
 
 final tomorrowDeliveryProvider =
-StateNotifierProvider<TomorrowDeliveryNotifier, TomorrowDeliveryState>(
-      (ref) {
+    StateNotifierProvider<TomorrowDeliveryNotifier, TomorrowDeliveryState>(
+  (ref) {
     final apiClient = ref.watch(apiClientProvider);
     final service = TomorrowDeliveryService(apiClient);
     return TomorrowDeliveryNotifier(service, ref);

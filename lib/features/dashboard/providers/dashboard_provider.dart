@@ -88,6 +88,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           tantoId: tantoId,
           targetDate: scheduledTargetDate,
         ),
+        riyo.haisouKanryoCount(shopId: parsedShopId, tantoId: tantoId),
       ]);
 
       final dashboardData = DashboardData(
@@ -100,8 +101,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         ),
         delivery: DeliveryInfo(
           tomorrowScheduledCount: results[6],
-          // 配送完了 API は pcw 側未実装のため当面 0 固定
-          completedTodayCount: 0,
+          completedTodayCount: results[7],
           scheduledTargetDate: scheduledTargetDate,
           completedTargetDate: completedTargetDate,
         ),

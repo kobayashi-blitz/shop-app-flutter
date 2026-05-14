@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
 import '../../../core/api/api_client.dart';
 import '../models/tomorrow_delivery_item.dart';
 
@@ -6,75 +10,56 @@ class TomorrowDeliveryService {
 
   TomorrowDeliveryService(this._apiClient);
 
-  // MOCK: pcw 側に対応 API 未実装のためデザイン確認用ダミーデータを返す。実装後に差し戻す。
+  /// 「翌日配送一覧」を pcw `haisouyotei/syosai` から取得する。
+  ///
+  /// pcw 側は今日〜翌日両方を返すので、クライアント側で `kibou_date == YMD` フィルタ。
+  /// [targetDate] は呼出元 (画面または provider) で `dashboard_data.scheduledTargetDate`
+  /// から確定済みの値を渡す（17 時切替ロジックの単一ソース化）。
+  ///
+  /// [haisouTantoNameFallback] が渡されたら、各 item の `haisouTantoName` を上書きする。
+  /// pcw 側に配送担当者名カラムが無いため、Service 層でログインユーザ名を埋める運用。
+  ///
+  /// 異常 (DioException, result != '1') は **例外を throw**。Provider 側で
+  /// state.error に詰めて UI に表示する。
   Future<List<TomorrowDeliveryItem>> fetchTomorrowList({
     required int shopId,
+    required int tantoId,
+    required DateTime targetDate,
+    String? haisouTantoNameFallback,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
-    final dateText =
-        '${tomorrow.year}/${tomorrow.month.toString().padLeft(2, '0')}/${tomorrow.day.toString().padLeft(2, '0')}';
+    final ymd =
+        '${targetDate.year}/${targetDate.month.toString().padLeft(2, '0')}/'
+        '${targetDate.day.toString().padLeft(2, '0')}';
 
-    return [
-      TomorrowDeliveryItem(
-        id: 1,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '山田 太郎 様',
-        deliveryDate: dateText,
-        deliveryTime: '09:30 - 10:30',
-        haisouTantoName: '中村 配送員',
-        itemName: '電動ベッド 3M (KQ-7733) ほか 2 点',
-        address: '〒530-0001 大阪府大阪市北区梅田 1-2-3',
-      ),
-      TomorrowDeliveryItem(
-        id: 2,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '佐藤 花子 様',
-        deliveryDate: dateText,
-        deliveryTime: '11:00 - 12:00',
-        haisouTantoName: '中村 配送員',
-        itemName: '車椅子 自走式 (NA-516A)',
-        address: '〒540-0008 大阪府大阪市中央区大手前 4-5-6',
-      ),
-      TomorrowDeliveryItem(
-        id: 3,
-        type: 'sale',
-        kubun: '販売',
-        customerName: '鈴木 一郎 様',
-        deliveryDate: dateText,
-        deliveryTime: '14:00 - 15:00',
-        haisouTantoName: '吉田 配送員',
-        itemName: '床ずれ防止クッション 2 点',
-        address: '〒541-0041 大阪府大阪市中央区北浜 2-1-10',
-      ),
-      TomorrowDeliveryItem(
-        id: 4,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '田中 美和 様',
-        deliveryDate: dateText,
-        deliveryTime: '',
-        haisouTantoName: '吉田 配送員',
-        itemName: '歩行器 (シルバーカート)',
-        address: '〒550-0014 大阪府大阪市西区北堀江 3-7-2',
-      ),
-      TomorrowDeliveryItem(
-        id: 5,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '高橋 健 様',
-        deliveryDate: dateText,
-        deliveryTime: '16:30 - 17:30',
-        haisouTantoName: '中村 配送員',
-        itemName: 'エアマット (ビッグセル)',
-        address: '〒553-0003 大阪府大阪市福島区福島 5-4-1',
-      ),
-    ];
+    final Response res;
+    try {
+      res = await _apiClient.post(
+        '/api/pcwMobileApi/shop/haisouyotei/syosai',
+        data: {'shop_id': shopId, 'tanto_id': tantoId},
+      );
+    } on DioException catch (e) {
+      throw Exception('配送予定の取得に失敗しました (${e.message ?? "通信エラー"})');
+    }
+
+    final data = _asMap(res.data);
+    if (data['result'] != '1') {
+      throw Exception('配送予定の取得に失敗しました (result=${data['result']})');
+    }
+    final list = (data['details'] as List?) ?? const [];
+    return list.whereType<Map>().where((e) => e['kibou_date'] == ymd).map((e) {
+      var item = TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e));
+      if (haisouTantoNameFallback != null &&
+          haisouTantoNameFallback.isNotEmpty &&
+          item.haisouTantoName.isEmpty) {
+        item = item.copyWith(haisouTantoName: haisouTantoNameFallback);
+      }
+      return item;
+    }).toList();
   }
 
-  // MOCK: 同上（本日完了側）。実装後に差し戻す。
+  // MOCK: pcw 側 `haisou-kanryo/syosai` 詳細 API が未実装のため、本日配送完了
+  // 「一覧」画面は MOCK 維持。件数カードは riyojokyo_service.haisouKanryoCount で
+  // 実 API 連携済み。詳細 API が pcw 側に追加されたら本メソッドを差し戻す。
   Future<List<TomorrowDeliveryItem>> fetchTodayCompletedList({
     required int shopId,
     String? targetDate,
@@ -110,7 +95,7 @@ class TomorrowDeliveryService {
       TomorrowDeliveryItem(
         id: 13,
         type: 'sale',
-        kubun: '販売',
+        kubun: '汎用配送',
         customerName: '小林 千夏 様',
         deliveryDate: dateText,
         deliveryTime: '13:20',
@@ -130,5 +115,19 @@ class TomorrowDeliveryService {
         address: '〒545-0011 大阪府大阪市阿倍野区昭和町 1-5-2',
       ),
     ];
+  }
+
+  // pcw 側 Content-Type が text/html のため Dio が自動 JSON 化しない。
+  // 文字列のときは手動 decode。riyojokyo_service.dart:218 と同形。
+  Map<String, dynamic> _asMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
   }
 }
