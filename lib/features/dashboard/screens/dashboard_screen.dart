@@ -35,6 +35,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return '¥${formatter.format(amount)}';
   }
 
+  /// 「5/14」のような短い日付表記を作る（カードタイトル用）
+  String _formatMonthDay(DateTime d) => '${d.month}/${d.day}';
+
   void _navigateToPlaceholder(String title) {
     if (title == '翌日配送予定') {
       Navigator.of(context).push(
@@ -279,11 +282,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildDeliveryTab(dynamic data) {
+    final scheduledLabel = _formatMonthDay(data.delivery.scheduledTargetDate);
+    final completedLabel = _formatMonthDay(data.delivery.completedTargetDate);
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
         _buildMetricCard(
-          title: '翌日配送予定',
+          title: '配送予定（$scheduledLabel日分）',
           value: '${data.delivery.tomorrowScheduledCount ?? 0}',
           unit: '件',
           icon: Icons.local_shipping,
@@ -292,7 +297,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(height: 8),
         _buildMetricCard(
-          title: '配送完了（本日）',
+          title: '配送完了（$completedLabel日分）',
           value: '${data.delivery.completedTodayCount ?? 0}',
           unit: '件',
           icon: Icons.check_circle,

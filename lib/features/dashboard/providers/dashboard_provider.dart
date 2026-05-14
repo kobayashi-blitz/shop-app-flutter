@@ -1,18 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../models/dashboard_data.dart';
-import 'dashboard_service.dart';
 import 'riyojokyo_service.dart';
-
-final dashboardServiceProvider = Provider<DashboardService>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return DashboardService(apiClient);
-});
 
 final riyojokyoServiceProvider = Provider<RiyojokyoService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return RiyojokyoService(apiClient);
 });
+
+/// 配送予定カードの表示対象日: 17 時を境に切替。
+/// 配送業務で午後遅くなったら翌日分に意識が向く運用に合わせる。
+DateTime resolveScheduledTargetDate(DateTime now) {
+  return now.hour < 17 ? now : now.add(const Duration(days: 1));
+}
+
+/// 配送完了カードの表示対象日: 常に当日（time of day で変えない）
+DateTime resolveCompletedTargetDate(DateTime now) {
+  return DateTime(now.year, now.month, now.day);
+}
 
 class DashboardState {
   final DashboardData? data;
@@ -39,11 +44,9 @@ class DashboardState {
 }
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
-  final DashboardService _dashboardService;
   final Ref _ref;
 
-  DashboardNotifier(this._dashboardService, this._ref)
-      : super(DashboardState());
+  DashboardNotifier(this._ref) : super(DashboardState());
 
   Future<void> loadDashboard() async {
     // ローディング開始
@@ -65,11 +68,12 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         return;
       }
 
-      // 配送件数（明日／本日完了）取得
-      final deliveryInfo =
-          await _dashboardService.fetchDeliveryInfo(shopId: parsedShopId);
+      // 配送カードの表示対象日を決定
+      final now = DateTime.now();
+      final scheduledTargetDate = resolveScheduledTargetDate(now);
+      final completedTargetDate = resolveCompletedTargetDate(now);
 
-      // 利用状況を pcw 側 RiyojokyoApi から並列取得
+      // 利用状況 + 配送予定（特定日分）を pcw 側 RiyojokyoApi から並列取得
       final tantoId = loginUser?.shopSyainId ?? 0;
       final riyo = _ref.read(riyojokyoServiceProvider);
       final results = await Future.wait<int>([
@@ -79,6 +83,11 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         riyo.rentalUriageTotal(shopId: parsedShopId, tantoId: tantoId),
         riyo.moreOneMonthDemoCount(shopId: parsedShopId, tantoId: tantoId),
         riyo.rentalSyohinCount(shopId: parsedShopId, tantoId: tantoId),
+        riyo.haisouYoteiCountForDate(
+          shopId: parsedShopId,
+          tantoId: tantoId,
+          targetDate: scheduledTargetDate,
+        ),
       ]);
 
       final dashboardData = DashboardData(
@@ -89,7 +98,13 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           officeName: loginUser?.shopName ?? '',
           shopName: loginUser?.shopName ?? '',
         ),
-        delivery: deliveryInfo,
+        delivery: DeliveryInfo(
+          tomorrowScheduledCount: results[6],
+          // 配送完了 API は pcw 側未実装のため当面 0 固定
+          completedTodayCount: 0,
+          scheduledTargetDate: scheduledTargetDate,
+          completedTargetDate: completedTargetDate,
+        ),
         usage: UsageInfo(
           newOrdersThisMonthCount: results[0],
           hospitalOnHoldCount: results[1],
@@ -122,6 +137,5 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
-  final dashboardService = ref.watch(dashboardServiceProvider);
-  return DashboardNotifier(dashboardService, ref);
+  return DashboardNotifier(ref);
 });

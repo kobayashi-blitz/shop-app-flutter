@@ -15,6 +15,11 @@ class RiyojokyoService {
   RiyojokyoService(this._apiClient);
 
   /// 件数系の共通呼び出し。result == '1' なら count を、'2' (空) なら 0 を返す。
+  ///
+  /// 設計上、**API 障害 (DioException) も真の 0 件もすべて 0 にフォールバック** する。
+  /// ダッシュボードの件数カードが画面エラーで埋まるより、暫定で 0 を見せて他カードの
+  /// 取得を続行する方が UX 上望ましいため。区別が必要になる場合は呼出し側で
+  /// 例外を再 throw する別メソッドを切ること。
   Future<int> _fetchCount(String path, int shopId, int tantoId) async {
     try {
       final res = await _apiClient.post(
@@ -55,8 +60,42 @@ class RiyojokyoService {
     }
   }
 
-  Future<int> haisouYoteiCount({required int shopId, required int tantoId}) =>
-      _fetchCount('/api/pcwMobileApi/shop/haisouyotei', shopId, tantoId);
+  /// 配送予定件数の「特定日分」だけを取得する。
+  ///
+  /// pcw 側 `shop/haisouyotei` API は本日〜翌日 2 日合算しか返さないので、
+  /// 詳細リスト (`shop/haisouyotei/syosai`) を取って `kibou_date == targetDate`
+  /// の件数をクライアント側でカウントする。
+  ///
+  /// [targetDate] は端末ローカル時刻基準の DateTime。`Y/M/D` 形式に変換して
+  /// API レスポンスの `kibou_date` (Y/m/d) と比較する。
+  Future<int> haisouYoteiCountForDate({
+    required int shopId,
+    required int tantoId,
+    required DateTime targetDate,
+  }) async {
+    final ymd =
+        '${targetDate.year}/${targetDate.month.toString().padLeft(2, '0')}/'
+        '${targetDate.day.toString().padLeft(2, '0')}';
+    try {
+      final res = await _apiClient.post(
+        '/api/pcwMobileApi/shop/haisouyotei/syosai',
+        data: {'shop_id': shopId, 'tanto_id': tantoId},
+      );
+      final data = _asMap(res.data);
+      if (data['result'] != '1') return 0;
+      final list = (data['details'] as List?) ?? const [];
+      return list.where((e) {
+        if (e is Map) {
+          return e['kibou_date'] == ymd;
+        }
+        return false;
+      }).length;
+    } on DioException {
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 
   Future<int> togetuSinkiOrderCount(
           {required int shopId, required int tantoId}) =>
