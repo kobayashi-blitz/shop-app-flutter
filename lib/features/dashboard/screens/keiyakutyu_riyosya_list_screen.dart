@@ -60,14 +60,18 @@ class _KeiyakutyuRiyosyaListScreenState
     }
   }
 
-  /// 利用者名で集約。同名別人は基本的に同一カードに混ざる前提（要件次第で primary_id 起点に変更可）
+  /// 利用者 ID で集約。
+  /// 旧仕様では `riyosyaName` をキーにしていたため同名別人が同一カードに混ざっていたが、
+  /// SAP-13 入院保留申請で利用者 ID が必要になったのを契機に id ベースに変更。
+  /// 副作用として同名別人は別カードに分かれる（仕様変更として PR で明記）。
   List<_RiyosyaGroup> _groupByRiyosya(List<KeiyakutyuRiyosyaItem> items) {
-    final map = <String, _RiyosyaGroup>{};
+    final map = <int, _RiyosyaGroup>{};
     for (final item in items) {
-      final key = item.riyosyaName;
+      final key = item.riyosyaId;
       final existing = map[key];
       if (existing == null) {
         map[key] = _RiyosyaGroup(
+          riyosyaId: item.riyosyaId,
           riyosyaName: item.riyosyaName,
           earliestKeiyakuDateFrom: item.keiyakuDateFrom,
           items: [item],
@@ -146,9 +150,18 @@ class _KeiyakutyuRiyosyaListScreenState
   }
 
   void _openSinsei(_RiyosyaGroup group) {
+    final shopId = ref.read(authProvider).user?.shopId;
+    if (shopId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ログイン情報が取得できませんでした。')),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => NyuinHoryuSinseiCreateScreen(
+          shopId: shopId,
+          riyosyaId: group.riyosyaId,
           riyosyaName: group.riyosyaName,
         ),
       ),
@@ -166,92 +179,95 @@ class _KeiyakutyuRiyosyaListScreenState
         onTap: () => _openSinsei(group),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    group.riyosyaName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '契約商品 ${group.items.length} 件',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (group.earliestKeiyakuDateFrom.isNotEmpty) ...[
-              const SizedBox(height: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  Icon(Icons.event, size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    '最初の契約: ${group.earliestKeiyakuDateFrom}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  Expanded(
+                    child: Text(
+                      group.riyosyaName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '契約商品 ${group.items.length} 件',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ],
-            const Divider(height: 16),
-            ...group.items.map((it) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.inventory_2,
-                          size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(it.syohinName,
-                                style: const TextStyle(fontSize: 13)),
-                            Text(
-                              '契約開始: ${it.keiyakuDateFrom}',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600),
-                            ),
-                          ],
+              if (group.earliestKeiyakuDateFrom.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.event, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      '最初の契約: ${group.earliestKeiyakuDateFrom}',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              ],
+              const Divider(height: 16),
+              ...group.items.map((it) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.inventory_2,
+                            size: 16, color: Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(it.syohinName,
+                                  style: const TextStyle(fontSize: 13)),
+                              Text(
+                                '契約開始: ${it.keiyakuDateFrom}',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                )),
-          ],
+                      ],
+                    ),
+                  )),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
 class _RiyosyaGroup {
+  final int riyosyaId;
   final String riyosyaName;
   String earliestKeiyakuDateFrom;
   final List<KeiyakutyuRiyosyaItem> items;
   _RiyosyaGroup({
+    required this.riyosyaId,
     required this.riyosyaName,
     required this.earliestKeiyakuDateFrom,
     required this.items,
