@@ -60,8 +60,8 @@ lib/
 │       ├── models/
 │       │   └── dashboard_data.dart   # ダッシュボードデータモデル
 │       └── providers/
-│           ├── dashboard_service.dart # ダッシュボードサービス
-│           └── dashboard_provider.dart # ダッシュボード状態管理
+│           ├── dashboard_provider.dart # ダッシュボード状態管理
+│           └── riyojokyo_service.dart  # 利用状況・配送予定 API ファサード
 ```
 
 ## セットアップ
