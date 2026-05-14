@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/env/app_env.dart';
 import '../providers/dashboard_provider.dart';
 import 'placeholder_screen.dart';
 import 'tomorrow_delivery_list_screen.dart';
@@ -190,7 +191,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const SizedBox.shrink(),
+          title: const _EnvBadge(),
           backgroundColor: Colors.indigo,
           foregroundColor: Colors.white,
           actions: [
@@ -518,6 +519,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 color: Colors.grey,
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// AppBar に表示する接続先（Local / Test / Prod / Custom）バッジ。
+class _EnvBadge extends StatelessWidget {
+  const _EnvBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final env = detectAppEnv();
+    final color = switch (env) {
+      AppEnv.local => Colors.grey.shade600,
+      AppEnv.test => Colors.orange.shade700,
+      AppEnv.prod => Colors.red.shade700,
+      AppEnv.custom => Colors.purple,
+    };
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          env.label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
