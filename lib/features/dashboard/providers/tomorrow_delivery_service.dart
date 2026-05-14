@@ -57,64 +57,45 @@ class TomorrowDeliveryService {
     }).toList();
   }
 
-  // MOCK: pcw 側 `haisou-kanryo/syosai` 詳細 API が未実装のため、本日配送完了
-  // 「一覧」画面は MOCK 維持。件数カードは riyojokyo_service.haisouKanryoCount で
-  // 実 API 連携済み。詳細 API が pcw 側に追加されたら本メソッドを差し戻す。
+  /// 「本日配送完了一覧」を pcw `haisou-kanryo/syosai` から取得する。
+  ///
+  /// pcw 側で完了日 = today で絞っているため、クライアント側で日付フィルタは不要。
+  /// 配送単位 (`hs1.haisou_id`) に集約済みのため、1 配送 = 1 行で返る
+  /// (件数 API と完全に一致)。
+  ///
+  /// [haisouTantoNameFallback] が渡されたら、各 item の `haisouTantoName` を上書き
+  /// (`fetchTomorrowList` と同じ運用、pcw 側に配送担当者名カラム無いため)。
+  ///
+  /// 異常 (DioException, result != '1') は **例外を throw**。
   Future<List<TomorrowDeliveryItem>> fetchTodayCompletedList({
     required int shopId,
-    String? targetDate,
+    required int tantoId,
+    String? haisouTantoNameFallback,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final today = DateTime.now();
-    final dateText =
-        '${today.year}/${today.month.toString().padLeft(2, '0')}/${today.day.toString().padLeft(2, '0')}';
+    final Response res;
+    try {
+      res = await _apiClient.post(
+        '/api/pcwMobileApi/shop/haisou-kanryo/syosai',
+        data: {'shop_id': shopId, 'tanto_id': tantoId},
+      );
+    } on DioException catch (e) {
+      throw Exception('本日配送完了の取得に失敗しました (${e.message ?? "通信エラー"})');
+    }
 
-    return [
-      TomorrowDeliveryItem(
-        id: 11,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '伊藤 良子 様',
-        deliveryDate: dateText,
-        deliveryTime: '09:00',
-        haisouTantoName: '中村 配送員',
-        itemName: '電動ベッド 3M (KQ-7733)',
-        address: '〒531-0072 大阪府大阪市北区豊崎 3-2-1',
-      ),
-      TomorrowDeliveryItem(
-        id: 12,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '渡辺 隆 様',
-        deliveryDate: dateText,
-        deliveryTime: '10:45',
-        haisouTantoName: '吉田 配送員',
-        itemName: 'サイドレール 2 本セット',
-        address: '〒532-0011 大阪府大阪市淀川区西中島 4-1-1',
-      ),
-      TomorrowDeliveryItem(
-        id: 13,
-        type: 'sale',
-        kubun: '汎用配送',
-        customerName: '小林 千夏 様',
-        deliveryDate: dateText,
-        deliveryTime: '13:20',
-        haisouTantoName: '中村 配送員',
-        itemName: '杖 (折りたたみ式)',
-        address: '〒536-0014 大阪府大阪市城東区鶴見 2-3-4',
-      ),
-      TomorrowDeliveryItem(
-        id: 14,
-        type: 'rental',
-        kubun: 'レンタル',
-        customerName: '中島 進 様',
-        deliveryDate: dateText,
-        deliveryTime: '15:10',
-        haisouTantoName: '吉田 配送員',
-        itemName: '車椅子 自走式 (NA-516A)',
-        address: '〒545-0011 大阪府大阪市阿倍野区昭和町 1-5-2',
-      ),
-    ];
+    final data = _asMap(res.data);
+    if (data['result'] != '1') {
+      throw Exception('本日配送完了の取得に失敗しました (result=${data['result']})');
+    }
+    final list = (data['details'] as List?) ?? const [];
+    return list.whereType<Map>().map((e) {
+      var item = TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e));
+      if (haisouTantoNameFallback != null &&
+          haisouTantoNameFallback.isNotEmpty &&
+          item.haisouTantoName.isEmpty) {
+        item = item.copyWith(haisouTantoName: haisouTantoNameFallback);
+      }
+      return item;
+    }).toList();
   }
 
   // pcw 側 Content-Type が text/html のため Dio が自動 JSON 化しない。

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/tomorrow_delivery_item.dart';
 import '../providers/tomorrow_delivery_service.dart';
@@ -29,7 +28,7 @@ class _TodayDeliveryCompletedListScreenState
 
   Future<void> _load() async {
     try {
-      // ログインユーザーから shop_id を取得
+      // ログインユーザーから shop_id / tantoId(shopSyainId) / shopSyainName を取得
       final authState = ref.read(authProvider);
       final loginUser = authState.user;
       final shopId = loginUser?.shopId;
@@ -42,11 +41,17 @@ class _TodayDeliveryCompletedListScreenState
         return;
       }
 
+      final tantoId = loginUser?.shopSyainId ?? 0;
+      final fallbackName = loginUser?.shopSyainName ?? '';
+
       final apiClient = ref.read(apiClientProvider);
       final service = TomorrowDeliveryService(apiClient);
 
       final list = await service.fetchTodayCompletedList(
-          shopId: shopId /*, targetDate: 任意 */);
+        shopId: shopId,
+        tantoId: tantoId,
+        haisouTantoNameFallback: fallbackName,
+      );
 
       setState(() {
         _items = list;
@@ -55,7 +60,9 @@ class _TodayDeliveryCompletedListScreenState
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        _error = e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : '本日配送完了の取得に失敗しました';
       });
     }
   }
