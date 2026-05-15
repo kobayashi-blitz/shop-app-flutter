@@ -47,7 +47,18 @@ class TomorrowDeliveryItem {
   /// 一覧表示に必要な項目のみ保持。利用者住所と配送担当者名は **詳細画面 (HaisouDetail) 経由** で取得し、
   /// 一覧モデルには持たない (PR 設計上、責務分離)。
   factory TomorrowDeliveryItem.fromJson(Map<String, dynamic> json) {
-    final idRaw = json['primary_id'];
+    // `id` は配送詳細 API (`haisou/detail`) で使うため hs1.haisou_id を優先する。
+    // pcw 側 syosai API では `haisou_id` カラムで返却 (PR #3000 で追加)。
+    // 旧バージョン (pcw 未デプロイ時) には `haisou_id` が無いので `primary_id` にフォールバック
+    // するが、その場合は kubun ごとに primary_id の意味が違うため詳細遷移は失敗する。
+    final haisouIdRaw = json['haisou_id'];
+    final primaryIdRaw = json['primary_id'];
+    final idRaw = haisouIdRaw ?? primaryIdRaw;
+    if (haisouIdRaw == null && primaryIdRaw != null) {
+      // ignore: avoid_print
+      print(
+          '[WARN] TomorrowDeliveryItem: haisou_id がレスポンスに無いため primary_id にフォールバック。pcw 側 syosai API が未デプロイの可能性があります。');
+    }
     final kubunRaw = (json['kubun'] ?? '').toString();
 
     return TomorrowDeliveryItem(
