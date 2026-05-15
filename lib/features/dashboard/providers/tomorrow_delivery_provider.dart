@@ -41,7 +41,7 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // ログイン情報から shopId / tantoId(shopSyainId) / shopSyainName を取得
+      // ログイン情報から shopId / tantoId(shopSyainId) を取得
       final authState = _ref.read(authProvider);
       final loginUser = authState.user;
       final shopId = loginUser?.shopId;
@@ -55,13 +55,11 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
       }
 
       final tantoId = loginUser?.shopSyainId ?? 0;
-      final fallbackName = loginUser?.shopSyainName ?? '';
 
       final items = await _service.fetchTomorrowList(
         shopId: shopId,
         tantoId: tantoId,
         targetDate: targetDate,
-        haisouTantoNameFallback: fallbackName,
       );
 
       state = state.copyWith(

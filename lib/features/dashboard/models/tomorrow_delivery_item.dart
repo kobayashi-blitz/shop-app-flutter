@@ -5,7 +5,8 @@ class TomorrowDeliveryItem {
   final String customerName; // 利用者名
   final String deliveryDate; // 納品希望日 (YYYY/MM/DD)
   final String deliveryTime; // 納品時間（空文字の場合もあり）
-  final String haisouTantoName; // 配送担当者（pcw 側未提供のため Service 層でログインユーザ名を埋める）
+  final String
+      haisouTantoName; // 配送担当者（pcw `m13_syain_tbl.syain_name` from `hs1.syain_id`）
   final String itemName; // 商品名
   final String address; // 納品先住所
 
@@ -45,15 +46,13 @@ class TomorrowDeliveryItem {
     );
   }
 
-  /// pcw `haisouyotei/syosai` レスポンスの 1 要素から構築する。
+  /// pcw `haisouyotei/syosai` / `haisou-kanryo/syosai` レスポンスの 1 要素から構築する。
   ///
   /// pcw 側 SELECT (5 種別 UNION ALL) の出力キーをそのまま読む:
   ///   primary_id, kubun ('1'〜'5'), kibou_date, kibou_time, hosoku,
   ///   riyosya_name, syohin_name (or panhaisou_hinmei),
-  ///   riyosya_pref, riyosya_jyusyo_1, riyosya_jyusyo_2
-  ///
-  /// `haisouTantoName` は pcw 側に対応カラム無し → 空文字。Service 層で
-  /// ログインユーザ名をフォールバックとして埋める運用。
+  ///   riyosya_pref, riyosya_jyusyo_1, riyosya_jyusyo_2,
+  ///   haisou_tanto_name (hs1.syain_id → m13.syain_name)
   factory TomorrowDeliveryItem.fromJson(Map<String, dynamic> json) {
     final idRaw = json['primary_id'];
     final kubunRaw = (json['kubun'] ?? '').toString();
@@ -65,7 +64,7 @@ class TomorrowDeliveryItem {
       customerName: (json['riyosya_name'] ?? '') as String,
       deliveryDate: (json['kibou_date'] ?? '') as String,
       deliveryTime: _pickDeliveryTime(json),
-      haisouTantoName: '',
+      haisouTantoName: (json['haisou_tanto_name'] ?? '') as String,
       itemName: _pickItemName(json),
       address: _composeAddress(json),
     );

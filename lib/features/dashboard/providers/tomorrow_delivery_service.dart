@@ -16,16 +16,12 @@ class TomorrowDeliveryService {
   /// [targetDate] は呼出元 (画面または provider) で `dashboard_data.scheduledTargetDate`
   /// から確定済みの値を渡す（17 時切替ロジックの単一ソース化）。
   ///
-  /// [haisouTantoNameFallback] が渡されたら、各 item の `haisouTantoName` を上書きする。
-  /// pcw 側に配送担当者名カラムが無いため、Service 層でログインユーザ名を埋める運用。
-  ///
   /// 異常 (DioException, result != '1') は **例外を throw**。Provider 側で
   /// state.error に詰めて UI に表示する。
   Future<List<TomorrowDeliveryItem>> fetchTomorrowList({
     required int shopId,
     required int tantoId,
     required DateTime targetDate,
-    String? haisouTantoNameFallback,
   }) async {
     final ymd =
         '${targetDate.year}/${targetDate.month.toString().padLeft(2, '0')}/'
@@ -46,15 +42,11 @@ class TomorrowDeliveryService {
       throw Exception('配送予定の取得に失敗しました (result=${data['result']})');
     }
     final list = (data['details'] as List?) ?? const [];
-    return list.whereType<Map>().where((e) => e['kibou_date'] == ymd).map((e) {
-      var item = TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e));
-      if (haisouTantoNameFallback != null &&
-          haisouTantoNameFallback.isNotEmpty &&
-          item.haisouTantoName.isEmpty) {
-        item = item.copyWith(haisouTantoName: haisouTantoNameFallback);
-      }
-      return item;
-    }).toList();
+    return list
+        .whereType<Map>()
+        .where((e) => e['kibou_date'] == ymd)
+        .map((e) => TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   /// 「本日配送完了一覧」を pcw `haisou-kanryo/syosai` から取得する。
@@ -63,14 +55,10 @@ class TomorrowDeliveryService {
   /// 配送単位 (`hs1.haisou_id`) に集約済みのため、1 配送 = 1 行で返る
   /// (件数 API と完全に一致)。
   ///
-  /// [haisouTantoNameFallback] が渡されたら、各 item の `haisouTantoName` を上書き
-  /// (`fetchTomorrowList` と同じ運用、pcw 側に配送担当者名カラム無いため)。
-  ///
   /// 異常 (DioException, result != '1') は **例外を throw**。
   Future<List<TomorrowDeliveryItem>> fetchTodayCompletedList({
     required int shopId,
     required int tantoId,
-    String? haisouTantoNameFallback,
   }) async {
     final Response res;
     try {
@@ -87,15 +75,10 @@ class TomorrowDeliveryService {
       throw Exception('本日配送完了の取得に失敗しました (result=${data['result']})');
     }
     final list = (data['details'] as List?) ?? const [];
-    return list.whereType<Map>().map((e) {
-      var item = TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e));
-      if (haisouTantoNameFallback != null &&
-          haisouTantoNameFallback.isNotEmpty &&
-          item.haisouTantoName.isEmpty) {
-        item = item.copyWith(haisouTantoName: haisouTantoNameFallback);
-      }
-      return item;
-    }).toList();
+    return list
+        .whereType<Map>()
+        .map((e) => TomorrowDeliveryItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   // pcw 側 Content-Type が text/html のため Dio が自動 JSON 化しない。
