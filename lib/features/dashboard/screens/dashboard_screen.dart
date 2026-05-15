@@ -357,7 +357,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(height: 8),
         _buildMetricCard(
-          title: '契約利用者数',
+          title: '契約利用者 / 入院保留申請',
           value: '${data.usage.contractUserCount ?? 0}',
           unit: '人',
           icon: Icons.people,

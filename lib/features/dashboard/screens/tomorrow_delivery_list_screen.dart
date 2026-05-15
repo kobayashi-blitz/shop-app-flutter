@@ -40,7 +40,7 @@ class _TomorrowDeliveryListScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('翌日配送予定（$dateText）'),
+        title: Text('配送予定（$dateText）'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
