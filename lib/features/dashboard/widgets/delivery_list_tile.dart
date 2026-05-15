@@ -8,6 +8,9 @@ import '../screens/delivery_detail_screen.dart';
 /// バッジ色は kubun=3 (汎用配送) → 緑、それ以外 (レンタル/返却/預入) → 青。
 /// タップで [DeliveryDetailScreen] に遷移。呼出側で `detailMode` を指定して
 /// 配送予定 (scheduled) / 配送完了 (completed) を切り替える。
+///
+/// 一覧では「担当配送員」は表示せず、詳細画面で表示する。
+/// 利用者住所も一覧では表示せず、代わりに「引渡し場所」を表示する。
 class DeliveryListTile extends StatelessWidget {
   final TomorrowDeliveryItem item;
   final DeliveryDetailMode detailMode;
@@ -28,10 +31,6 @@ class DeliveryListTile extends StatelessWidget {
       item.deliveryDate,
       item.deliveryTime,
     ].where((s) => s.isNotEmpty).join(' ');
-
-    final tantoText = item.haisouTantoName.isEmpty
-        ? '担当配送員: -'
-        : '担当配送員: ${item.haisouTantoName}';
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -62,9 +61,9 @@ class DeliveryListTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 上段: 区分バッジ + 日時 + 担当配送員
+            // 上段: 区分バッジ + 日時
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   padding:
@@ -84,27 +83,12 @@ class DeliveryListTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dateTimeText,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        tantoText,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  child: Text(
+                    dateTimeText,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
                 ),
               ],
@@ -119,13 +103,26 @@ class DeliveryListTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            // 住所
-            Text(
-              item.address,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-              ),
+            // 引渡し場所
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.home_work_outlined,
+                  size: 16,
+                  color: Colors.grey.shade700,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    item.placeDelivery.isEmpty ? '-' : item.placeDelivery,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             // 商品名
