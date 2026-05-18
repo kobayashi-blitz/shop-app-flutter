@@ -125,13 +125,15 @@ class DeliveryListTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            // 商品名
+            // 商品名 (利用者単位集約後は '、' 連結文字列で来るため 2 行で省略)
             Text(
               item.itemName,
               style: const TextStyle(
                 fontSize: 14,
                 color: Colors.black87,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
