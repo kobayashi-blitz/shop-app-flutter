@@ -29,6 +29,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
   List<DenpyoSearchItem> _items = [];
   bool _hasSearched = false;
   bool _sortAsc = false; // false=新しい順(デフォルト、pcw 現状と一致), true=古い順
+  bool _filtersExpanded = true; // 初期は開いている、ユーザの手動開閉のみ
 
   /// 現ページの _items を `denpyoDate` で並び替える。
   /// denpyoDate は "YYYY年MM月DD日" (zero-padded) なので文字列比較で日付順になる。
@@ -171,7 +172,9 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       ),
       body: Column(
         children: [
-          _buildFilters(),
+          _buildFilterHeader(),
+          _buildFiltersCollapsible(),
+          _buildResultSummary(),
           const Divider(height: 1),
           Expanded(child: _buildListBody()),
           _buildPager(),
@@ -229,102 +232,147 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
     return List.generate(end - start + 1, (i) => start + i);
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilterHeader() {
+    return InkWell(
+      onTap: (_isSearching || _isPaging)
+          ? null
+          : () => setState(() => _filtersExpanded = !_filtersExpanded),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            Icon(Icons.filter_list, size: 18, color: Colors.indigo.shade700),
+            const SizedBox(width: 8),
+            const Text('検索条件',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            AnimatedRotation(
+              turns: _filtersExpanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.expand_more, color: Colors.grey.shade700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersCollapsible() {
     final dateLabel = _hakkoubi == null
         ? '希望日（指定なし）'
         : DateFormat('yyyy/MM/dd').format(_hakkoubi!);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('伝票種類',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          Wrap(
-            spacing: 8,
-            children: DenpyoTypeOption.all.map((opt) {
-              final selected = _selectedTypes.contains(opt.code);
-              return FilterChip(
-                label: Text(opt.label, style: const TextStyle(fontSize: 12)),
-                selected: selected,
-                onSelected: (_isSearching || _isPaging)
-                    ? null
-                    : (v) {
-                        setState(() {
-                          if (v) {
-                            _selectedTypes.add(opt.code);
-                          } else {
-                            _selectedTypes.remove(opt.code);
-                          }
-                        });
-                      },
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 8),
-          const Text('並び順',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment<bool>(value: false, label: Text('新しい順')),
-              ButtonSegment<bool>(value: true, label: Text('古い順')),
-            ],
-            selected: {_sortAsc},
-            onSelectionChanged: (_isSearching || _isPaging)
-                ? null
-                : (set) => _onSortChanged(set.first),
-            showSelectedIcon: false,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: (_isSearching || _isPaging) ? null : _pickDate,
-                  icon: const Icon(Icons.event, size: 18),
-                  label: Text(dateLabel),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: ClipRect(
+        child: Visibility(
+          visible: _filtersExpanded,
+          // 選択状態は `_selectedTypes` / `_sortAsc` / `_hakkoubi` クラスフィールドで
+          // 保持済なので state 維持目的では不要。AnimatedSize の高さ補間が安定する
+          // よう Widget tree を残すために true。
+          maintainState: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('伝票種類',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                Wrap(
+                  spacing: 8,
+                  children: DenpyoTypeOption.all.map((opt) {
+                    final selected = _selectedTypes.contains(opt.code);
+                    return FilterChip(
+                      label:
+                          Text(opt.label, style: const TextStyle(fontSize: 12)),
+                      selected: selected,
+                      onSelected: (_isSearching || _isPaging)
+                          ? null
+                          : (v) {
+                              setState(() {
+                                if (v) {
+                                  _selectedTypes.add(opt.code);
+                                } else {
+                                  _selectedTypes.remove(opt.code);
+                                }
+                              });
+                            },
+                    );
+                  }).toList(),
                 ),
-              ),
-              if (_hakkoubi != null)
-                IconButton(
-                  onPressed: (_isSearching || _isPaging)
+                const SizedBox(height: 8),
+                const Text('並び順',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(value: false, label: Text('新しい順')),
+                    ButtonSegment<bool>(value: true, label: Text('古い順')),
+                  ],
+                  selected: {_sortAsc},
+                  onSelectionChanged: (_isSearching || _isPaging)
                       ? null
-                      : () => setState(() => _hakkoubi = null),
-                  icon: const Icon(Icons.clear, size: 18),
-                  tooltip: '希望日をクリア',
+                      : (set) => _onSortChanged(set.first),
+                  showSelectedIcon: false,
                 ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: (_isSearching || _isPaging) ? null : _search,
-                icon: _isSearching
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.search, size: 18),
-                label: const Text('検索'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  foregroundColor: Colors.white,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            (_isSearching || _isPaging) ? null : _pickDate,
+                        icon: const Icon(Icons.event, size: 18),
+                        label: Text(dateLabel),
+                      ),
+                    ),
+                    if (_hakkoubi != null)
+                      IconButton(
+                        onPressed: (_isSearching || _isPaging)
+                            ? null
+                            : () => setState(() => _hakkoubi = null),
+                        icon: const Icon(Icons.clear, size: 18),
+                        tooltip: '希望日をクリア',
+                      ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: (_isSearching || _isPaging) ? null : _search,
+                      icon: _isSearching
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.search, size: 18),
+                      label: const Text('検索'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          if (_hasSearched &&
-              !_isSearching &&
-              _error == null &&
-              _items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '$_total 件中 ${(_currentPage - 1) * _perPage + 1}-${(_currentPage - 1) * _perPage + _items.length} 件目',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
+              ],
             ),
-        ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultSummary() {
+    if (!_hasSearched || _isSearching || _error != null || _items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Text(
+        '$_total 件中 ${(_currentPage - 1) * _perPage + 1}-${(_currentPage - 1) * _perPage + _items.length} 件目',
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
       ),
     );
   }
