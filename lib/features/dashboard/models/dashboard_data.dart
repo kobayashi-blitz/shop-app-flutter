@@ -53,7 +53,8 @@ class DeliveryInfo {
   final int tomorrowScheduledCount;
 
   /// 「配送完了」カードの件数。表示対象日は [completedTargetDate]（常に当日）。
-  /// API 未実装のため当面 0 固定。実装後に実値を入れる。
+  /// pcw `haisou-kanryo` API 連携済み（種別ごとの完了日カラム = today で判定、
+  /// 預入系のみ r31.updated_at で代用の近似）。
   final int completedTodayCount;
 
   /// 配送予定カードのタイトルに表示する日付（17 時を境に切替）

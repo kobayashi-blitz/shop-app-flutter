@@ -117,6 +117,12 @@ class RiyojokyoService {
           {required int shopId, required int tantoId}) =>
       _fetchCount('/api/pcwMobileApi/shop/nyuin-horyu-syohin', shopId, tantoId);
 
+  /// 本日の配送完了件数。pcw 側 `haisou-kanryo` は配送種別ごとに完了日カラム = today
+  /// (預入系は r31.updated_at で代用) でカウントを返す。`_fetchCount` パターンで
+  /// 失敗時は 0 フォールバック。
+  Future<int> haisouKanryoCount({required int shopId, required int tantoId}) =>
+      _fetchCount('/api/pcwMobileApi/shop/haisou-kanryo', shopId, tantoId);
+
   /// レンタル売上累計。pcw 側 SQL が重く 504 になることがあるので失敗時は 0 を返す。
   Future<int> rentalUriageTotal({required int shopId, required int tantoId}) =>
       _fetchTotalKin('/api/pcwMobileApi/shop/rental-uriage', shopId, tantoId);

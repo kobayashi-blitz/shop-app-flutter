@@ -40,17 +40,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _formatMonthDay(DateTime d) => '${d.month}/${d.day}';
 
   void _navigateToPlaceholder(String title) {
-    if (title == '翌日配送予定') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TomorrowDeliveryListScreen(
-            targetDate: DateTime.now().add(const Duration(days: 1)),
-          ),
-        ),
-      );
-      return;
-    }
-
     if (title == '配送完了（本日）') {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -303,7 +292,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           unit: '件',
           icon: Icons.local_shipping,
           color: Colors.orange,
-          onTap: () => _navigateToPlaceholder('翌日配送予定'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TomorrowDeliveryListScreen(
+                targetDate: data.delivery.scheduledTargetDate,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
         _buildMetricCard(
@@ -366,7 +361,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(height: 8),
         _buildMetricCard(
-          title: '契約利用者数',
+          title: '契約利用者 / 入院保留申請',
           value: '${data.usage.contractUserCount ?? 0}',
           unit: '人',
           icon: Icons.people,
