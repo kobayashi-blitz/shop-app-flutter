@@ -5,10 +5,9 @@ class TomorrowDeliveryItem {
   final String customerName; // 利用者名
   final String deliveryDate; // 納品希望日 (YYYY/MM/DD)
   final String deliveryTime; // 納品時間（空文字の場合もあり）
-  final String
-      haisouTantoName; // 配送担当者（pcw `m13_syain_tbl.syain_name` from `hs1.syain_id`）
   final String itemName; // 商品名
-  final String address; // 納品先住所
+  final String
+      placeDelivery; // 引渡し場所 (pcw `*.nouhin_place` / `r31.hikitori_place`)
 
   TomorrowDeliveryItem({
     required this.id,
@@ -17,9 +16,8 @@ class TomorrowDeliveryItem {
     required this.customerName,
     required this.deliveryDate,
     required this.deliveryTime,
-    required this.haisouTantoName,
     required this.itemName,
-    required this.address,
+    required this.placeDelivery,
   });
 
   TomorrowDeliveryItem copyWith({
@@ -29,9 +27,8 @@ class TomorrowDeliveryItem {
     String? customerName,
     String? deliveryDate,
     String? deliveryTime,
-    String? haisouTantoName,
     String? itemName,
-    String? address,
+    String? placeDelivery,
   }) {
     return TomorrowDeliveryItem(
       id: id ?? this.id,
@@ -40,21 +37,28 @@ class TomorrowDeliveryItem {
       customerName: customerName ?? this.customerName,
       deliveryDate: deliveryDate ?? this.deliveryDate,
       deliveryTime: deliveryTime ?? this.deliveryTime,
-      haisouTantoName: haisouTantoName ?? this.haisouTantoName,
       itemName: itemName ?? this.itemName,
-      address: address ?? this.address,
+      placeDelivery: placeDelivery ?? this.placeDelivery,
     );
   }
 
   /// pcw `haisouyotei/syosai` / `haisou-kanryo/syosai` レスポンスの 1 要素から構築する。
   ///
-  /// pcw 側 SELECT (5 種別 UNION ALL) の出力キーをそのまま読む:
-  ///   primary_id, kubun ('1'〜'5'), kibou_date, kibou_time, hosoku,
-  ///   riyosya_name, syohin_name (or panhaisou_hinmei),
-  ///   riyosya_pref, riyosya_jyusyo_1, riyosya_jyusyo_2,
-  ///   haisou_tanto_name (hs1.syain_id → m13.syain_name)
+  /// 一覧表示に必要な項目のみ保持。利用者住所と配送担当者名は **詳細画面 (HaisouDetail) 経由** で取得し、
+  /// 一覧モデルには持たない (PR 設計上、責務分離)。
   factory TomorrowDeliveryItem.fromJson(Map<String, dynamic> json) {
-    final idRaw = json['primary_id'];
+    // `id` は配送詳細 API (`haisou/detail`) で使うため hs1.haisou_id を優先する。
+    // pcw 側 syosai API では `haisou_id` カラムで返却 (PR #3000 で追加)。
+    // 旧バージョン (pcw 未デプロイ時) には `haisou_id` が無いので `primary_id` にフォールバック
+    // するが、その場合は kubun ごとに primary_id の意味が違うため詳細遷移は失敗する。
+    final haisouIdRaw = json['haisou_id'];
+    final primaryIdRaw = json['primary_id'];
+    final idRaw = haisouIdRaw ?? primaryIdRaw;
+    if (haisouIdRaw == null && primaryIdRaw != null) {
+      // ignore: avoid_print
+      print(
+          '[WARN] TomorrowDeliveryItem: haisou_id がレスポンスに無いため primary_id にフォールバック。pcw 側 syosai API が未デプロイの可能性があります。');
+    }
     final kubunRaw = (json['kubun'] ?? '').toString();
 
     return TomorrowDeliveryItem(
@@ -64,9 +68,8 @@ class TomorrowDeliveryItem {
       customerName: (json['riyosya_name'] ?? '') as String,
       deliveryDate: (json['kibou_date'] ?? '') as String,
       deliveryTime: _pickDeliveryTime(json),
-      haisouTantoName: (json['haisou_tanto_name'] ?? '') as String,
       itemName: _pickItemName(json),
-      address: _composeAddress(json),
+      placeDelivery: (json['place_delivery'] ?? '') as String,
     );
   }
 
@@ -106,15 +109,5 @@ class TomorrowDeliveryItem {
     final syohin = (json['syohin_name'] ?? '').toString();
     if (syohin.isNotEmpty) return syohin;
     return (json['panhaisou_hinmei'] ?? '').toString();
-  }
-
-  /// riyosya_pref + riyosya_jyusyo_1 + riyosya_jyusyo_2 を空フィールドをスキップして連結。
-  static String _composeAddress(Map<String, dynamic> json) {
-    final parts = <String>[
-      (json['riyosya_pref'] ?? '').toString(),
-      (json['riyosya_jyusyo_1'] ?? '').toString(),
-      (json['riyosya_jyusyo_2'] ?? '').toString(),
-    ].where((s) => s.isNotEmpty).toList();
-    return parts.join('');
   }
 }
