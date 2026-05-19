@@ -174,6 +174,11 @@ class _SeikyusyoScreenState extends ConsumerState<SeikyusyoScreen> {
                 : const Icon(Icons.picture_as_pdf),
             label: Text(_isIssuing ? '発行中…（最大数分）' : '請求書 PDF を発行'),
           ),
+          const SizedBox(height: 8),
+          Text(
+            '※ 発行には数十秒〜数分かかる場合があります。',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
         ],
       ),
     );
