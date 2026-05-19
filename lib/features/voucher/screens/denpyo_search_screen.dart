@@ -15,19 +15,47 @@ class DenpyoSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
+  static const int _perPage = 50;
+
   final Set<String> _selectedTypes = {'1'}; // デフォルト：レンタル納品伝票
   DateTime? _hakkoubi;
   bool _isSearching = false;
+  bool _isPaging = false;
   bool _isOpening = false;
   String? _error;
   int _total = 0;
+  int _currentPage = 1;
+  int _totalPages = 1;
   List<DenpyoSearchItem> _items = [];
   bool _hasSearched = false;
 
-  Future<void> _search() async {
+  Future<void> _fetch(int page) async {
     final user = ref.read(authProvider).user;
     final shopId = user?.shopId;
     if (shopId == null) {
+      throw Exception('ログイン情報が取得できませんでした。');
+    }
+    final service = ref.read(voucherServiceProvider);
+    final hakkoubi =
+        _hakkoubi == null ? null : DateFormat('yyyy-MM-dd').format(_hakkoubi!);
+    final res = await service.searchDenpyo(
+      shopId: shopId,
+      denpyoSyurui: _selectedTypes.toList(),
+      hakkoubi: hakkoubi,
+      page: page,
+      perPage: _perPage,
+    );
+    setState(() {
+      _items = res.items;
+      _total = res.total;
+      _currentPage = res.page;
+      _totalPages = (res.total / _perPage).ceil().clamp(1, 9999);
+    });
+  }
+
+  Future<void> _search() async {
+    final user = ref.read(authProvider).user;
+    if (user?.shopId == null) {
       setState(() => _error = 'ログイン情報が取得できませんでした。');
       return;
     }
@@ -40,29 +68,31 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       _isSearching = true;
       _error = null;
       _hasSearched = true;
+      _currentPage = 1;
     });
     try {
-      final service = ref.read(voucherServiceProvider);
-      final hakkoubi = _hakkoubi == null
-          ? null
-          : DateFormat('yyyy-MM-dd').format(_hakkoubi!);
-      final res = await service.searchDenpyo(
-        shopId: shopId,
-        denpyoSyurui: _selectedTypes.toList(),
-        hakkoubi: hakkoubi,
-        page: 1,
-        perPage: 100,
-      );
-      setState(() {
-        _items = res.items;
-        _total = res.total;
-        _isSearching = false;
-      });
+      await _fetch(1);
     } catch (_) {
-      setState(() {
-        _isSearching = false;
-        _error = '伝票検索に失敗しました';
-      });
+      setState(() => _error = '伝票検索に失敗しました');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _goToPage(int newPage) async {
+    final clamped = newPage.clamp(1, _totalPages);
+    if (clamped == _currentPage) return;
+    setState(() => _isPaging = true);
+    try {
+      await _fetch(clamped);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ページ取得に失敗しました')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPaging = false);
     }
   }
 
@@ -120,9 +150,59 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
           _buildFilters(),
           const Divider(height: 1),
           Expanded(child: _buildListBody()),
+          _buildPager(),
         ],
       ),
     );
+  }
+
+  Widget _buildPager() {
+    if (!_hasSearched || _items.isEmpty) return const SizedBox.shrink();
+
+    final pageNums = _calcWindowedPages(_currentPage, _totalPages);
+    final canPrev = !_isPaging && !_isSearching && _currentPage > 1;
+    final canNext = !_isPaging && !_isSearching && _currentPage < _totalPages;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            onPressed: canPrev ? () => _goToPage(_currentPage - 1) : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          ...pageNums.map((p) => _PageNumButton(
+                page: p,
+                isCurrent: p == _currentPage,
+                enabled: !_isPaging && !_isSearching,
+                onTap: () => _goToPage(p),
+              )),
+          IconButton(
+            onPressed: canNext ? () => _goToPage(_currentPage + 1) : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 現在ページを中心に前後 2 ページずつ、最大 5 番号を返す。
+  /// 端では片側を多めに表示し常に 5 個 (足りなければ可能な分) を維持。
+  List<int> _calcWindowedPages(int current, int total) {
+    if (total <= 5) return List.generate(total, (i) => i + 1);
+    int start = current - 2;
+    int end = current + 2;
+    if (start < 1) {
+      end += (1 - start);
+      start = 1;
+    }
+    if (end > total) {
+      start -= (end - total);
+      end = total;
+    }
+    start = start.clamp(1, total);
+    return List.generate(end - start + 1, (i) => start + i);
   }
 
   Widget _buildFilters() {
@@ -144,7 +224,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
               return FilterChip(
                 label: Text(opt.label, style: const TextStyle(fontSize: 12)),
                 selected: selected,
-                onSelected: _isSearching
+                onSelected: (_isSearching || _isPaging)
                     ? null
                     : (v) {
                         setState(() {
@@ -163,14 +243,14 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _isSearching ? null : _pickDate,
+                  onPressed: (_isSearching || _isPaging) ? null : _pickDate,
                   icon: const Icon(Icons.event, size: 18),
                   label: Text(dateLabel),
                 ),
               ),
               if (_hakkoubi != null)
                 IconButton(
-                  onPressed: _isSearching
+                  onPressed: (_isSearching || _isPaging)
                       ? null
                       : () => setState(() => _hakkoubi = null),
                   icon: const Icon(Icons.clear, size: 18),
@@ -178,7 +258,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
                 ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
-                onPressed: _isSearching ? null : _search,
+                onPressed: (_isSearching || _isPaging) ? null : _search,
                 icon: _isSearching
                     ? const SizedBox(
                         width: 16,
@@ -194,11 +274,14 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
               ),
             ],
           ),
-          if (_hasSearched && !_isSearching && _error == null)
+          if (_hasSearched &&
+              !_isSearching &&
+              _error == null &&
+              _items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                '$_total 件 (上位 ${_items.length} 件を表示)',
+                '$_total 件中 ${(_currentPage - 1) * _perPage + 1}-${(_currentPage - 1) * _perPage + _items.length} 件目',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
               ),
             ),
@@ -277,7 +360,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: _isOpening ? null : () => _openPdf(item),
+        onTap: (_isOpening || _isPaging) ? null : () => _openPdf(item),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           child: Column(
@@ -355,6 +438,44 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PageNumButton extends StatelessWidget {
+  final int page;
+  final bool isCurrent;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _PageNumButton({
+    required this.page,
+    required this.isCurrent,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: TextButton(
+          onPressed: (enabled && !isCurrent) ? onTap : null,
+          style: TextButton.styleFrom(
+            backgroundColor: isCurrent ? Colors.indigo : null,
+            foregroundColor: isCurrent ? Colors.white : Colors.indigo,
+            disabledForegroundColor:
+                isCurrent ? Colors.white : Colors.grey.shade400,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: EdgeInsets.zero,
+          ),
+          child: Text('$page'),
         ),
       ),
     );
