@@ -28,6 +28,29 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
   int _totalPages = 1;
   List<DenpyoSearchItem> _items = [];
   bool _hasSearched = false;
+  bool _sortAsc = false; // false=新しい順(デフォルト、pcw 現状と一致), true=古い順
+
+  /// 現ページの _items を `denpyoDate` で並び替える。
+  /// denpyoDate は "YYYY年MM月DD日" (zero-padded) なので文字列比較で日付順になる。
+  /// 空文字 (日付不明) は昇順/降順どちらでも末尾に固定。
+  void _applySort() {
+    _items.sort((a, b) {
+      if (a.denpyoDate.isEmpty && b.denpyoDate.isEmpty) return 0;
+      if (a.denpyoDate.isEmpty) return 1;
+      if (b.denpyoDate.isEmpty) return -1;
+      return _sortAsc
+          ? a.denpyoDate.compareTo(b.denpyoDate)
+          : b.denpyoDate.compareTo(a.denpyoDate);
+    });
+  }
+
+  void _onSortChanged(bool asc) {
+    if (_sortAsc == asc) return;
+    setState(() {
+      _sortAsc = asc;
+      _applySort();
+    });
+  }
 
   Future<void> _fetch(int page) async {
     final user = ref.read(authProvider).user;
@@ -47,6 +70,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
     );
     setState(() {
       _items = res.items;
+      _applySort();
       _total = res.total;
       _currentPage = res.page;
       _totalPages = (res.total / _perPage).ceil().clamp(1, 9999);
@@ -237,6 +261,21 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
                       },
               );
             }).toList(),
+          ),
+          const SizedBox(height: 8),
+          const Text('並び順',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(value: false, label: Text('新しい順')),
+              ButtonSegment<bool>(value: true, label: Text('古い順')),
+            ],
+            selected: {_sortAsc},
+            onSelectionChanged: (_isSearching || _isPaging)
+                ? null
+                : (set) => _onSortChanged(set.first),
+            showSelectedIcon: false,
           ),
           const SizedBox(height: 8),
           Row(
