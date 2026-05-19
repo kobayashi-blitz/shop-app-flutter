@@ -176,7 +176,7 @@ class _SeikyusyoScreenState extends ConsumerState<SeikyusyoScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '※ 発行には数十秒〜数分かかる場合があります（売上 SQL の重さによる）。',
+            '※ 発行には数十秒〜数分かかる場合があります。',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         ],

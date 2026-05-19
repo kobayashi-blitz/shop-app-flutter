@@ -199,10 +199,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           foregroundColor: Colors.white,
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.read(dashboardProvider.notifier).refresh();
-              },
+              icon: dashboardState.isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.refresh),
+              onPressed: dashboardState.isLoading
+                  ? null
+                  : () => ref.read(dashboardProvider.notifier).refresh(),
             ),
             IconButton(
               icon: const Icon(Icons.logout),
