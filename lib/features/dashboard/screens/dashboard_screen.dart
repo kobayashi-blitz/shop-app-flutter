@@ -12,6 +12,7 @@ import 'nyuin_horyu_list_screen.dart';
 import 'rental_syohin_list_screen.dart';
 import 'keiyakutyu_riyosya_list_screen.dart';
 import 'tyoki_demo_list_screen.dart';
+import 'rental_uriage_history_screen.dart';
 import '../../user/screens/user_detail_screen.dart';
 import '../../voucher/screens/voucher_hub_screen.dart';
 
@@ -377,7 +378,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           unit: '',
           icon: Icons.currency_yen,
           color: Colors.green,
-          onTap: null,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const RentalUriageHistoryScreen(),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
         _buildTextActionRow(
