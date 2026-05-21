@@ -41,24 +41,27 @@ class RiyojokyoService {
   /// totalkin (金額) 系の共通呼び出し。pcw 側 SQL が重いため timeout 30 秒。
   /// 呼出側で `Future.wait` の並列 API から分離して独立 future にすることで
   /// 他カード表示をブロックしない設計とする (dashboard_provider 参照)。
-  Future<int> _fetchTotalKin(String path, int shopId, int tantoId) async {
+  ///
+  /// 成功時は数値、失敗 (timeout/DioException/result != '1'/パース不能) 時は `null`。
+  /// 呼出側で実値 0 と取得失敗を区別し、UI で「-」表示等に分岐するため null を返す。
+  Future<int?> _fetchTotalKin(String path, int shopId, int tantoId) async {
     try {
       final res = await _apiClient.post(
         path,
         data: {'shop_id': shopId, 'tanto_id': tantoId},
       ).timeout(const Duration(seconds: 30));
       final data = _asMap(res.data);
-      if (data['result'] != '1') return 0;
+      if (data['result'] != '1') return null;
       final raw = data['totalkin'];
       if (raw is int) return raw;
       if (raw is num) return raw.toInt();
-      return int.tryParse('$raw') ?? 0;
+      return int.tryParse('$raw');
     } on TimeoutException {
-      return 0;
+      return null;
     } on DioException {
-      return 0;
+      return null;
     } catch (_) {
-      return 0;
+      return null;
     }
   }
 
@@ -125,8 +128,9 @@ class RiyojokyoService {
   Future<int> haisouKanryoCount({required int shopId, required int tantoId}) =>
       _fetchCount('/api/pcwMobileApi/shop/haisou-kanryo', shopId, tantoId);
 
-  /// レンタル売上累計。pcw 側 SQL が重く 504 になることがあるので失敗時は 0 を返す。
-  Future<int> rentalUriageTotal({required int shopId, required int tantoId}) =>
+  /// レンタル売上累計。pcw 側 SQL が重く 504 になることがあるので失敗時は null を返す。
+  /// 呼出側で実値 0 と取得失敗を区別する。
+  Future<int?> rentalUriageTotal({required int shopId, required int tantoId}) =>
       _fetchTotalKin('/api/pcwMobileApi/shop/rental-uriage', shopId, tantoId);
 
   /// 当月新規受注詳細

@@ -25,15 +25,20 @@ class DashboardState {
   final String? error;
 
   /// レンタル売上累計 (`rentalUriageTotal`) は SQL が重く、ダッシュボード並列 8 API
-  /// から分離して独立 future で取得する。取得中は true、完了 (or 30 秒 timeout で 0
-  /// フォールバック) で false。UI 側でカード値を「集計中..」表示するのに使う。
+  /// から分離して独立 future で取得する。取得中は true、完了 (or 30 秒 timeout) で
+  /// false。UI 側でカード値を「集計中..」表示するのに使う。
   final bool rentalSalesLoading;
+
+  /// 累計取得が失敗 (timeout / DioException / result != '1' / パース不能) した場合 true。
+  /// 実値 0 と取得失敗を区別するため、UI で「-」表示に分岐する。
+  final bool rentalSalesFailed;
 
   DashboardState({
     this.data,
     this.isLoading = false,
     this.error,
     this.rentalSalesLoading = false,
+    this.rentalSalesFailed = false,
   });
 
   DashboardState copyWith({
@@ -41,12 +46,14 @@ class DashboardState {
     bool? isLoading,
     String? error,
     bool? rentalSalesLoading,
+    bool? rentalSalesFailed,
   }) {
     return DashboardState(
       data: data ?? this.data,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       rentalSalesLoading: rentalSalesLoading ?? this.rentalSalesLoading,
+      rentalSalesFailed: rentalSalesFailed ?? this.rentalSalesFailed,
     );
   }
 }
@@ -61,6 +68,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     state = state.copyWith(
       isLoading: true,
       rentalSalesLoading: true,
+      rentalSalesFailed: false,
       error: null,
     );
 
@@ -76,6 +84,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         state = state.copyWith(
           isLoading: false,
           rentalSalesLoading: false,
+          rentalSalesFailed: false,
           error: 'ログイン情報に代理店IDがありません。',
         );
         return;
@@ -137,6 +146,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
       // 累計を独立 future で取得、完了で state 更新
       // (await しないので他カードと並列に実行される。state 更新は async コールバック内)
+      // rentalSales が null なら取得失敗 → rentalSalesFailed=true で UI に「-」表示
       riyo
           .rentalUriageTotal(shopId: parsedShopId, tantoId: tantoId)
           .then((rentalSales) {
@@ -151,24 +161,29 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
               newOrdersThisMonthCount: current.usage.newOrdersThisMonthCount,
               hospitalOnHoldCount: current.usage.hospitalOnHoldCount,
               contractUserCount: current.usage.contractUserCount,
-              rentalSalesAmountMonth: rentalSales,
+              rentalSalesAmountMonth: rentalSales ?? 0,
               oneMonthDemoCount: current.usage.oneMonthDemoCount,
               rentalInUseCount: current.usage.rentalInUseCount,
             ),
           ),
           rentalSalesLoading: false,
+          rentalSalesFailed: rentalSales == null,
         );
       }).catchError((_) {
-        // _fetchTotalKin 内で 30 秒 timeout/DioException は 0 フォールバック済
-        // (ここに来るのは想定外の例外、念のため Loading フラグだけ落とす)
+        // _fetchTotalKin 内で各種例外は null 返却済。
+        // ここに来るのは想定外、念のため失敗扱いにする。
         if (!mounted) return;
-        state = state.copyWith(rentalSalesLoading: false);
+        state = state.copyWith(
+          rentalSalesLoading: false,
+          rentalSalesFailed: true,
+        );
       });
     } catch (e) {
       // ここに来ることはほぼ無いが、念のためエラー処理を残しておく
       state = state.copyWith(
         isLoading: false,
         rentalSalesLoading: false,
+        rentalSalesFailed: false,
         error: 'ダッシュボードデータの取得に失敗しました',
       );
     }
