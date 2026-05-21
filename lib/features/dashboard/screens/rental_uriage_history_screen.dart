@@ -8,7 +8,8 @@ import '../providers/rental_uriage_history_provider.dart';
 /// 担当者単位のレンタル売上 月別履歴画面。
 ///
 /// ダッシュボード「レンタル売上（累計）」カードのタップで遷移。
-/// pcw `rental-uriage/monthly` API から当月含む過去 13 ヶ月の月別合計を取得する。
+/// pcw `rental-uriage/monthly` API から **過去 12 ヶ月** の月別合計と累計
+/// (`totalkin_all` + `period_from` / `period_to`) を取得する。
 class RentalUriageHistoryScreen extends ConsumerStatefulWidget {
   const RentalUriageHistoryScreen({super.key});
 
@@ -89,27 +90,13 @@ class _RentalUriageHistoryScreenState
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
-        _buildHeader(tantoName, state.totalkinAll),
+        _buildHeader(
+          tantoName,
+          state.totalkinAll,
+          state.periodFrom,
+          state.periodTo,
+        ),
         const SizedBox(height: 12),
-        _buildPeriodSelector(state.months, state.isLoading),
-        const SizedBox(height: 12),
-        // 期間切替で再ロード中は薄く Progress を表示 (既存 items は維持表示)
-        if (state.isLoading && state.items.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                SizedBox(width: 8),
-                Text('集計中..', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ),
         if (!hasAnyData)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 32),
@@ -129,24 +116,15 @@ class _RentalUriageHistoryScreenState
     );
   }
 
-  Widget _buildPeriodSelector(int currentMonths, bool isLoading) {
-    return SegmentedButton<int>(
-      segments: const [
-        ButtonSegment<int>(value: 3, label: Text('3 ヶ月')),
-        ButtonSegment<int>(value: 6, label: Text('6 ヶ月')),
-        ButtonSegment<int>(value: 12, label: Text('12 ヶ月')),
-      ],
-      selected: {currentMonths},
-      onSelectionChanged: isLoading
-          ? null
-          : (set) => ref
-              .read(rentalUriageHistoryProvider.notifier)
-              .load(months: set.first),
-      showSelectedIcon: false,
-    );
-  }
-
-  Widget _buildHeader(String tantoName, int totalkinAll) {
+  Widget _buildHeader(
+    String tantoName,
+    int totalkinAll,
+    String periodFrom,
+    String periodTo,
+  ) {
+    final periodText = (periodFrom.isNotEmpty && periodTo.isNotEmpty)
+        ? '$periodFrom 〜 $periodTo'
+        : '';
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -172,6 +150,14 @@ class _RentalUriageHistoryScreenState
                 color: Colors.green.shade800,
               ),
             ),
+            if (periodText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '対象期間: $periodText',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+              ),
           ],
         ),
       ),
