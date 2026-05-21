@@ -50,14 +50,18 @@ class ApiClient {
   }
 
   /// 汎用 POST メソッド
+  ///
+  /// [options] で個別 API ごとの receiveTimeout 等を上書き可能。
   Future<Response> post(
     String path, {
     Map<String, dynamic>? data,
+    Options? options,
   }) async {
     try {
       return await _dio.post(
         path,
         data: data,
+        options: options,
       );
     } catch (e) {
       rethrow;

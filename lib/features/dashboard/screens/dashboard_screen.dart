@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/env/app_env.dart';
+import '../models/dashboard_data.dart';
 import '../providers/dashboard_provider.dart';
 import 'placeholder_screen.dart';
 import 'tomorrow_delivery_list_screen.dart';
@@ -12,6 +13,7 @@ import 'nyuin_horyu_list_screen.dart';
 import 'rental_syohin_list_screen.dart';
 import 'keiyakutyu_riyosya_list_screen.dart';
 import 'tyoki_demo_list_screen.dart';
+import 'rental_uriage_history_screen.dart';
 import '../../user/screens/user_detail_screen.dart';
 import '../../voucher/screens/voucher_hub_screen.dart';
 
@@ -38,6 +40,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   /// 「5/14」のような短い日付表記を作る（カードタイトル用）
   String _formatMonthDay(DateTime d) => '${d.month}/${d.day}';
+
+  /// レンタル売上カード value の表示分岐:
+  /// 1. ロード中 → 「集計中..」
+  /// 2. 取得失敗 (timeout/通信エラー) → 「-」 (実値 0 と区別)
+  /// 3. 成功 → 金額表示
+  String _rentalSalesValue(DashboardData data) {
+    final state = ref.watch(dashboardProvider);
+    if (state.rentalSalesLoading) return '集計中..';
+    if (state.rentalSalesFailed) return '-';
+    return _formatCurrency(data.usage.rentalSalesAmountMonth);
+  }
 
   void _navigateToPlaceholder(String title) {
     if (title == '配送完了（本日）') {
@@ -371,13 +384,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         const SizedBox(height: 8),
         _buildMetricCard(
           title: 'レンタル売上（累計）',
-          value: _formatCurrency(
-            data.usage.rentalSalesAmountMonth ?? 0,
-          ),
+          value: _rentalSalesValue(data),
           unit: '',
           icon: Icons.currency_yen,
           color: Colors.green,
-          onTap: null,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const RentalUriageHistoryScreen(),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
         _buildTextActionRow(

@@ -24,21 +24,36 @@ class DashboardState {
   final bool isLoading;
   final String? error;
 
+  /// レンタル売上累計 (`rentalUriageTotal`) は SQL が重く、ダッシュボード並列 8 API
+  /// から分離して独立 future で取得する。取得中は true、完了 (or 30 秒 timeout) で
+  /// false。UI 側でカード値を「集計中..」表示するのに使う。
+  final bool rentalSalesLoading;
+
+  /// 累計取得が失敗 (timeout / DioException / result != '1' / パース不能) した場合 true。
+  /// 実値 0 と取得失敗を区別するため、UI で「-」表示に分岐する。
+  final bool rentalSalesFailed;
+
   DashboardState({
     this.data,
     this.isLoading = false,
     this.error,
+    this.rentalSalesLoading = false,
+    this.rentalSalesFailed = false,
   });
 
   DashboardState copyWith({
     DashboardData? data,
     bool? isLoading,
     String? error,
+    bool? rentalSalesLoading,
+    bool? rentalSalesFailed,
   }) {
     return DashboardState(
       data: data ?? this.data,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      rentalSalesLoading: rentalSalesLoading ?? this.rentalSalesLoading,
+      rentalSalesFailed: rentalSalesFailed ?? this.rentalSalesFailed,
     );
   }
 }
@@ -49,8 +64,13 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   DashboardNotifier(this._ref) : super(DashboardState());
 
   Future<void> loadDashboard() async {
-    // ローディング開始
-    state = state.copyWith(isLoading: true, error: null);
+    // ローディング開始 (累計は別 future で独立管理)
+    state = state.copyWith(
+      isLoading: true,
+      rentalSalesLoading: true,
+      rentalSalesFailed: false,
+      error: null,
+    );
 
     try {
       // ★ ログインユーザー情報を Auth から取得
@@ -63,6 +83,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       if (parsedShopId == null) {
         state = state.copyWith(
           isLoading: false,
+          rentalSalesLoading: false,
+          rentalSalesFailed: false,
           error: 'ログイン情報に代理店IDがありません。',
         );
         return;
@@ -74,13 +96,13 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       final completedTargetDate = resolveCompletedTargetDate(now);
 
       // 利用状況 + 配送予定（特定日分）を pcw 側 RiyojokyoApi から並列取得
+      // rentalUriageTotal は SQL が重いため Future.wait から分離 (後段で独立実行)
       final tantoId = loginUser?.shopSyainId ?? 0;
       final riyo = _ref.read(riyojokyoServiceProvider);
       final results = await Future.wait<int>([
         riyo.togetuSinkiOrderCount(shopId: parsedShopId, tantoId: tantoId),
         riyo.nyuinHoryuSyohinCount(shopId: parsedShopId, tantoId: tantoId),
         riyo.keiyakutyuRiyosyaCount(shopId: parsedShopId, tantoId: tantoId),
-        riyo.rentalUriageTotal(shopId: parsedShopId, tantoId: tantoId),
         riyo.moreOneMonthDemoCount(shopId: parsedShopId, tantoId: tantoId),
         riyo.rentalSyohinCount(shopId: parsedShopId, tantoId: tantoId),
         riyo.haisouYoteiCountForDate(
@@ -100,8 +122,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           shopName: loginUser?.shopName ?? '',
         ),
         delivery: DeliveryInfo(
-          tomorrowScheduledCount: results[6],
-          completedTodayCount: results[7],
+          tomorrowScheduledCount: results[5],
+          completedTodayCount: results[6],
           scheduledTargetDate: scheduledTargetDate,
           completedTargetDate: completedTargetDate,
         ),
@@ -109,22 +131,59 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           newOrdersThisMonthCount: results[0],
           hospitalOnHoldCount: results[1],
           contractUserCount: results[2],
-          rentalSalesAmountMonth: results[3],
-          oneMonthDemoCount: results[4],
-          rentalInUseCount: results[5],
+          rentalSalesAmountMonth: 0, // 別 future で後段更新、ロード中は UI で「集計中..」表示
+          oneMonthDemoCount: results[3],
+          rentalInUseCount: results[4],
         ),
       );
 
-      // 状態更新（ローディング終了＋データ反映）
+      // 状態更新 (他カードはここで表示、累計のみ rentalSalesLoading=true のまま)
       state = state.copyWith(
         data: dashboardData,
         isLoading: false,
         error: null,
       );
+
+      // 累計を独立 future で取得、完了で state 更新
+      // (await しないので他カードと並列に実行される。state 更新は async コールバック内)
+      // rentalSales が null なら取得失敗 → rentalSalesFailed=true で UI に「-」表示
+      riyo
+          .rentalUriageTotal(shopId: parsedShopId, tantoId: tantoId)
+          .then((rentalSales) {
+        if (!mounted) return;
+        final current = state.data;
+        if (current == null) return;
+        state = state.copyWith(
+          data: DashboardData(
+            user: current.user,
+            delivery: current.delivery,
+            usage: UsageInfo(
+              newOrdersThisMonthCount: current.usage.newOrdersThisMonthCount,
+              hospitalOnHoldCount: current.usage.hospitalOnHoldCount,
+              contractUserCount: current.usage.contractUserCount,
+              rentalSalesAmountMonth: rentalSales ?? 0,
+              oneMonthDemoCount: current.usage.oneMonthDemoCount,
+              rentalInUseCount: current.usage.rentalInUseCount,
+            ),
+          ),
+          rentalSalesLoading: false,
+          rentalSalesFailed: rentalSales == null,
+        );
+      }).catchError((_) {
+        // _fetchTotalKin 内で各種例外は null 返却済。
+        // ここに来るのは想定外、念のため失敗扱いにする。
+        if (!mounted) return;
+        state = state.copyWith(
+          rentalSalesLoading: false,
+          rentalSalesFailed: true,
+        );
+      });
     } catch (e) {
       // ここに来ることはほぼ無いが、念のためエラー処理を残しておく
       state = state.copyWith(
         isLoading: false,
+        rentalSalesLoading: false,
+        rentalSalesFailed: false,
         error: 'ダッシュボードデータの取得に失敗しました',
       );
     }
