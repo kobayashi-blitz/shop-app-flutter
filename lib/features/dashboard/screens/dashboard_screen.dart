@@ -14,7 +14,7 @@ import 'rental_syohin_list_screen.dart';
 import 'keiyakutyu_riyosya_list_screen.dart';
 import 'tyoki_demo_list_screen.dart';
 import 'rental_uriage_history_screen.dart';
-import '../../user/screens/user_detail_screen.dart';
+import 'riyosya_syokai_list_screen.dart';
 import '../../voucher/screens/voucher_hub_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -62,10 +62,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return;
     }
 
-    if (title == 'お客様詳細（仮）') {
+    if (title == '利用者照会') {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const UserDetailScreen(),
+          builder: (_) => const RiyosyaSyokaiListScreen(),
         ),
       );
       return;
@@ -396,10 +396,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(height: 8),
         _buildTextActionRow(
-          title: 'お客様詳細（仮）',
-          icon: Icons.person_outline,
+          title: '利用者照会',
+          icon: Icons.person_search,
           color: Colors.indigo,
-          onTap: () => _navigateToPlaceholder('お客様詳細（仮）'),
+          onTap: () => _navigateToPlaceholder('利用者照会'),
         ),
       ],
     );

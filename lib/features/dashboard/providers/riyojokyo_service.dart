@@ -7,6 +7,7 @@ import '../models/keiyakutyu_riyosya_item.dart';
 import '../models/monthly_order_item.dart';
 import '../models/nyuin_horyu_item.dart';
 import '../models/rental_syohin_item.dart';
+import '../models/riyosya_syokai_item.dart';
 import '../models/tyoki_demo_item.dart';
 
 class RiyojokyoService {
@@ -187,6 +188,24 @@ class RiyojokyoService {
       '契約中利用者詳細',
     );
     return list.map((e) => KeiyakutyuRiyosyaItem.fromJson(e)).toList();
+  }
+
+  /// 利用者照会（過去契約含む全利用者の詳細＋基本情報）。
+  ///
+  /// pcw 側で「契約として意味のあるステータス」のみフィルタ済み
+  /// (NOHIN_ZUMI=30 / KEIYAKU_CHU=40 / HENKYAKU_MACHI=50 / 同 COMPLETE=55,57)。
+  /// 商品行単位で m41 基本情報を含むため、画面側で riyosya_id で groupBy する。
+  Future<List<RiyosyaSyokaiItem>> riyosyaSyokaiDetails({
+    required int shopId,
+    required int tantoId,
+  }) async {
+    final list = await _fetchDetails(
+      '/api/pcwMobileApi/shop/riyosya-syokai',
+      shopId,
+      tantoId,
+      '利用者照会',
+    );
+    return list.map((e) => RiyosyaSyokaiItem.fromJson(e)).toList();
   }
 
   /// 長期デモ詳細（API は 30日以上のレコードを返す。3ヶ月以上はフロントで絞り込み）
