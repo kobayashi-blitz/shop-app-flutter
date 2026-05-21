@@ -372,9 +372,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         const SizedBox(height: 8),
         _buildMetricCard(
           title: 'レンタル売上（累計）',
-          value: _formatCurrency(
-            data.usage.rentalSalesAmountMonth ?? 0,
-          ),
+          value: ref.watch(dashboardProvider).rentalSalesLoading
+              ? '集計中..'
+              : _formatCurrency(data.usage.rentalSalesAmountMonth ?? 0),
           unit: '',
           icon: Icons.currency_yen,
           color: Colors.green,

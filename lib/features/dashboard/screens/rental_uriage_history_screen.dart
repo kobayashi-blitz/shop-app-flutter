@@ -53,7 +53,16 @@ class _RentalUriageHistoryScreenState
 
   Widget _buildBody(RentalUriageHistoryState state, String tantoName) {
     if (state.isLoading && state.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('集計中..', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
     }
 
     if (state.error != null && state.items.isEmpty) {
@@ -81,7 +90,26 @@ class _RentalUriageHistoryScreenState
       padding: const EdgeInsets.all(16),
       children: [
         _buildHeader(tantoName, state.totalkinAll),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        _buildPeriodSelector(state.months, state.isLoading),
+        const SizedBox(height: 12),
+        // 期間切替で再ロード中は薄く Progress を表示 (既存 items は維持表示)
+        if (state.isLoading && state.items.isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 8),
+                Text('集計中..', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
         if (!hasAnyData)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 32),
@@ -98,6 +126,23 @@ class _RentalUriageHistoryScreenState
                 child: _buildMonthTile(item.ym, item.rentalKin, item.count),
               )),
       ],
+    );
+  }
+
+  Widget _buildPeriodSelector(int currentMonths, bool isLoading) {
+    return SegmentedButton<int>(
+      segments: const [
+        ButtonSegment<int>(value: 3, label: Text('3 ヶ月')),
+        ButtonSegment<int>(value: 6, label: Text('6 ヶ月')),
+        ButtonSegment<int>(value: 12, label: Text('12 ヶ月')),
+      ],
+      selected: {currentMonths},
+      onSelectionChanged: isLoading
+          ? null
+          : (set) => ref
+              .read(rentalUriageHistoryProvider.notifier)
+              .load(months: set.first),
+      showSelectedIcon: false,
     );
   }
 

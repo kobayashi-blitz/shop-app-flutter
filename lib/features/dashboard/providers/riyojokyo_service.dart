@@ -38,13 +38,15 @@ class RiyojokyoService {
     }
   }
 
-  /// totalkin (金額) 系の共通呼び出し。pcw 側 SQL が重く 504 になるので 3 秒で諦めて 0 にフォールバック。
+  /// totalkin (金額) 系の共通呼び出し。pcw 側 SQL が重いため timeout 30 秒。
+  /// 呼出側で `Future.wait` の並列 API から分離して独立 future にすることで
+  /// 他カード表示をブロックしない設計とする (dashboard_provider 参照)。
   Future<int> _fetchTotalKin(String path, int shopId, int tantoId) async {
     try {
       final res = await _apiClient.post(
         path,
         data: {'shop_id': shopId, 'tanto_id': tantoId},
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 30));
       final data = _asMap(res.data);
       if (data['result'] != '1') return 0;
       final raw = data['totalkin'];

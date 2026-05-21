@@ -18,18 +18,21 @@ class RentalUriageHistoryService {
 
   /// 担当者単位のレンタル売上月別履歴を取得する。
   ///
-  /// pcw 側は当月含む過去 13 ヶ月をデータなし月も 0 埋めして DESC で返す。
+  /// pcw 側は `months` パラメータで取得月数を指定 (デフォルト 3、最大 24)。
+  /// データなし月も 0 埋めして DESC で返す。
   /// 異常 (DioException, result != '1') は **例外を throw**。
-  /// Provider 側で state.error に詰めて UI に表示する。
+  /// SQL が重いため receiveTimeout は 60 秒に明示延長 (Dio default 30 秒の上書き)。
   Future<RentalUriageHistoryResult> fetchMonthly({
     required int shopId,
     required int tantoId,
+    int months = 3,
   }) async {
     final Response res;
     try {
       res = await _apiClient.post(
         '/api/pcwMobileApi/shop/rental-uriage/monthly',
-        data: {'shop_id': shopId, 'tanto_id': tantoId},
+        data: {'shop_id': shopId, 'tanto_id': tantoId, 'months': months},
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
       );
     } on DioException catch (e) {
       throw Exception('レンタル売上履歴の取得に失敗しました (${e.message ?? "通信エラー"})');
@@ -41,12 +44,12 @@ class RentalUriageHistoryService {
     }
     final totalkinAll = int.tryParse('${data['totalkin_all']}') ?? 0;
     final list = (data['months'] as List?) ?? const [];
-    final months = list
+    final monthItems = list
         .whereType<Map>()
         .map(
             (e) => RentalUriageMonthItem.fromJson(Map<String, dynamic>.from(e)))
         .toList();
-    return (totalkinAll: totalkinAll, months: months);
+    return (totalkinAll: totalkinAll, months: monthItems);
   }
 
   // pcw 側 Content-Type が text/html のため Dio が自動 JSON 化しない。

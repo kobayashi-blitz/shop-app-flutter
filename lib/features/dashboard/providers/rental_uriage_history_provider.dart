@@ -8,17 +8,21 @@ class RentalUriageHistoryState {
   final bool isLoading;
   final String? error;
 
-  /// 担当者の全期間累計 (pcw `totalkin_all`、税込)
+  /// 担当者の全期間累計 (pcw `totalkin_all`、税込)。`months` 切替に依存せず固定。
   final int totalkinAll;
 
-  /// 月別履歴 (当月含む 13 ヶ月分、DESC 順)
+  /// 月別履歴 (DESC 順)。長さは `months` と一致 (データなし月は 0 埋め)。
   final List<RentalUriageMonthItem> items;
+
+  /// 現在選択中の取得月数 (UI の SegmentedButton 選択値、3/6/12)
+  final int months;
 
   RentalUriageHistoryState({
     this.isLoading = false,
     this.error,
     this.totalkinAll = 0,
     this.items = const [],
+    this.months = 3,
   });
 
   RentalUriageHistoryState copyWith({
@@ -26,12 +30,14 @@ class RentalUriageHistoryState {
     String? error,
     int? totalkinAll,
     List<RentalUriageMonthItem>? items,
+    int? months,
   }) {
     return RentalUriageHistoryState(
       isLoading: isLoading ?? this.isLoading,
       error: error,
       totalkinAll: totalkinAll ?? this.totalkinAll,
       items: items ?? this.items,
+      months: months ?? this.months,
     );
   }
 }
@@ -44,8 +50,8 @@ class RentalUriageHistoryNotifier
   RentalUriageHistoryNotifier(this._service, this._ref)
       : super(RentalUriageHistoryState());
 
-  Future<void> load() async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> load({int months = 3}) async {
+    state = state.copyWith(isLoading: true, error: null, months: months);
 
     try {
       final authState = _ref.read(authProvider);
@@ -64,6 +70,7 @@ class RentalUriageHistoryNotifier
       final res = await _service.fetchMonthly(
         shopId: shopId,
         tantoId: tantoId,
+        months: months,
       );
 
       state = state.copyWith(
