@@ -2,25 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
-import '../../sinsei/screens/nyuin_horyu_sinsei_create_screen.dart';
-import '../models/keiyakutyu_riyosya_item.dart';
+import '../models/riyosya_syokai_item.dart';
 import '../providers/dashboard_provider.dart';
+import 'riyosya_syokai_detail_screen.dart';
 
-/// SAP-8 (+ SAP-15 統合候補): 契約中利用者詳細
+/// 利用者照会 一覧画面。担当者が過去に契約したことのある利用者を含む全リスト。
+///
+/// 「契約利用者 / 入院保留申請」が現在契約中のみだったのに対し、本画面は
+/// 過去契約 (返却完了系) も含めて閲覧できる。タップで利用者詳細画面へ遷移。
 ///
 /// 上部にテキスト検索 (名前 / ふりがな / 住所の部分一致) と、下部に
-/// 30 件単位のページャを備える。`お客様控え伝票検索` 画面の UI パターンと、
-/// 利用者照会画面 ([RiyosyaSyokaiListScreen]) の検索 / ページャ実装を踏襲。
-class KeiyakutyuRiyosyaListScreen extends ConsumerStatefulWidget {
-  const KeiyakutyuRiyosyaListScreen({super.key});
+/// 30 件単位のページャを備える。`お客様控え伝票検索` 画面の UI を踏襲。
+/// データ取得済みのクライアント側フィルタ + ページングなので追加 API
+/// コールはしない。
+class RiyosyaSyokaiListScreen extends ConsumerStatefulWidget {
+  const RiyosyaSyokaiListScreen({super.key});
 
   @override
-  ConsumerState<KeiyakutyuRiyosyaListScreen> createState() =>
-      _KeiyakutyuRiyosyaListScreenState();
+  ConsumerState<RiyosyaSyokaiListScreen> createState() =>
+      _RiyosyaSyokaiListScreenState();
 }
 
-class _KeiyakutyuRiyosyaListScreenState
-    extends ConsumerState<KeiyakutyuRiyosyaListScreen> {
+class _RiyosyaSyokaiListScreenState
+    extends ConsumerState<RiyosyaSyokaiListScreen> {
   bool _isLoading = true;
   String? _error;
   List<_RiyosyaGroup> _groups = [];
@@ -65,7 +69,7 @@ class _KeiyakutyuRiyosyaListScreenState
         return;
       }
       final service = ref.read(riyojokyoServiceProvider);
-      final raw = await service.keiyakutyuRiyosyaDetails(
+      final raw = await service.riyosyaSyokaiDetails(
         shopId: shopId,
         tantoId: tantoId,
       );
@@ -75,6 +79,7 @@ class _KeiyakutyuRiyosyaListScreenState
         _currentPage = 1;
       });
     } catch (_) {
+      // PII を含まない汎用メッセージのみ画面表示する。
       setState(() {
         _isLoading = false;
         _error = '取得に失敗しました';
@@ -82,11 +87,10 @@ class _KeiyakutyuRiyosyaListScreenState
     }
   }
 
-  /// 利用者 ID で集約。
-  /// 旧仕様では `riyosyaName` をキーにしていたため同名別人が同一カードに混ざっていたが、
-  /// SAP-13 入院保留申請で利用者 ID が必要になったのを契機に id ベースに変更。
-  /// 副作用として同名別人は別カードに分かれる（仕様変更として PR で明記）。
-  List<_RiyosyaGroup> _groupByRiyosya(List<KeiyakutyuRiyosyaItem> items) {
+  /// 利用者 ID で集約。商品行 1 行を 1 利用者カード内の 1 行に対応させる。
+  /// 並び順はサーバの ORDER BY (氏名 ASC, 契約開始日 DESC) を尊重するため
+  /// LinkedHashMap の挿入順を保持する。
+  List<_RiyosyaGroup> _groupByRiyosya(List<RiyosyaSyokaiItem> items) {
     final map = <int, _RiyosyaGroup>{};
     for (final item in items) {
       final key = item.riyosyaId;
@@ -95,31 +99,22 @@ class _KeiyakutyuRiyosyaListScreenState
         map[key] = _RiyosyaGroup(
           riyosyaId: item.riyosyaId,
           riyosyaName: item.riyosyaName,
-          earliestKeiyakuDateFrom: item.keiyakuDateFrom,
           items: [item],
         );
       } else {
         existing.items.add(item);
-        if (item.keiyakuDateFrom.isNotEmpty &&
-            (existing.earliestKeiyakuDateFrom.isEmpty ||
-                item.keiyakuDateFrom
-                        .compareTo(existing.earliestKeiyakuDateFrom) <
-                    0)) {
-          existing.earliestKeiyakuDateFrom = item.keiyakuDateFrom;
-        }
       }
     }
-    final list = map.values.toList();
-    list.sort((a, b) => a.riyosyaName.compareTo(b.riyosyaName));
-    return list;
+    return map.values.toList();
   }
 
   /// 検索クエリを正規化: 半角/全角スペース除去 + 大文字小文字無視。
   String _normalize(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[\s　]'), '');
 
+  /// 1 グループが現在のクエリにヒットするかを返す。
   /// 名前 / ふりがな / 住所 (pref + jyusyo1 + jyusyo2) のいずれかに
-  /// 部分一致したら true。グループの基本情報は items.first から取り出す。
+  /// 部分一致したら true。
   bool _matches(_RiyosyaGroup g, String normQuery) {
     if (normQuery.isEmpty) return true;
     final head = g.items.first;
@@ -144,6 +139,8 @@ class _KeiyakutyuRiyosyaListScreenState
   int _totalPagesOf(int filteredCount) =>
       (filteredCount / _perPage).ceil().clamp(1, 9999);
 
+  /// `_currentPage` が範囲外になった場合に最終ページに丸める。
+  /// 検索フィルタを変更した直後など、件数が縮んで現在ページが空になるのを防ぐ。
   int _safeCurrentPage(int totalPages) => _currentPage.clamp(1, totalPages);
 
   List<_RiyosyaGroup> _pageSlice(List<_RiyosyaGroup> filtered, int safePage) {
@@ -168,6 +165,7 @@ class _KeiyakutyuRiyosyaListScreenState
     }
   }
 
+  /// 検索クエリ変更時は 1 ページ目に戻す。
   void _onQueryChanged(String v) {
     setState(() {
       _query = v;
@@ -187,10 +185,10 @@ class _KeiyakutyuRiyosyaListScreenState
     final pageItems = _pageSlice(filtered, safePage);
 
     final title = _groups.isEmpty
-        ? '契約中の利用者'
+        ? '利用者照会'
         : hasQuery
-            ? '契約中の利用者（${filtered.length}/${_groups.length}名）'
-            : '契約中の利用者（${_groups.length}名）';
+            ? '利用者照会（${filtered.length}/${_groups.length}名）'
+            : '利用者照会（${_groups.length}名）';
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -314,7 +312,7 @@ class _KeiyakutyuRiyosyaListScreenState
         children: const [
           SizedBox(height: 80),
           Center(
-            child: Text('契約中の利用者はいません',
+            child: Text('利用者はいません',
                 style: TextStyle(fontSize: 16, color: Colors.grey)),
           ),
         ],
@@ -344,6 +342,7 @@ class _KeiyakutyuRiyosyaListScreenState
   }
 
   /// ページャ。`お客様控え伝票検索` と同形 (前へ ← + 5 番号 + 次へ →)。
+  /// 結果 0 件 / 1 ページのみの場合は表示しない。
   Widget _buildPager(int filteredCount, int safePage, int totalPages) {
     if (filteredCount == 0 || totalPages <= 1) {
       return const SizedBox.shrink();
@@ -376,6 +375,7 @@ class _KeiyakutyuRiyosyaListScreenState
   }
 
   /// 現在ページを中心に前後 2 ページずつ、最大 5 番号を返す。
+  /// 端では片側を多めに表示し常に 5 個 (足りなければ可能な分) を維持。
   List<int> _calcWindowedPages(int current, int total) {
     if (total <= 5) return List.generate(total, (i) => i + 1);
     int start = current - 2;
@@ -392,26 +392,17 @@ class _KeiyakutyuRiyosyaListScreenState
     return List.generate(end - start + 1, (i) => start + i);
   }
 
-  void _openSinsei(_RiyosyaGroup group) {
-    final shopId = ref.read(authProvider).user?.shopId;
-    if (shopId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログイン情報が取得できませんでした。')),
-      );
-      return;
-    }
+  void _openDetail(_RiyosyaGroup group) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => NyuinHoryuSinseiCreateScreen(
-          shopId: shopId,
-          riyosyaId: group.riyosyaId,
-          riyosyaName: group.riyosyaName,
-        ),
+        builder: (_) => RiyosyaSyokaiDetailScreen(items: group.items),
       ),
     );
   }
 
   Widget _buildGroupCard(_RiyosyaGroup group) {
+    final displayName =
+        group.riyosyaName.isEmpty ? '(氏名未登録)' : group.riyosyaName;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -419,7 +410,7 @@ class _KeiyakutyuRiyosyaListScreenState
         side: BorderSide(color: Colors.grey.withOpacity(0.2)),
       ),
       child: InkWell(
-        onTap: () => _openSinsei(group),
+        onTap: () => _openDetail(group),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -430,7 +421,7 @@ class _KeiyakutyuRiyosyaListScreenState
                 children: [
                   Expanded(
                     child: Text(
-                      group.riyosyaName,
+                      displayName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -438,67 +429,50 @@ class _KeiyakutyuRiyosyaListScreenState
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '契約商品 ${group.items.length} 件',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                  ),
+                  _buildStatusBadges(group),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right,
+                      size: 20, color: Colors.grey.shade500),
                 ],
               ),
-              if (group.earliestKeiyakuDateFrom.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.event, size: 14, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Text(
-                      '最初の契約: ${group.earliestKeiyakuDateFrom}',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                    ),
-                  ],
-                ),
-              ],
-              const Divider(height: 16),
-              ...group.items.map((it) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.inventory_2,
-                            size: 16, color: Colors.grey.shade700),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(it.syohinName,
-                                  style: const TextStyle(fontSize: 13)),
-                              Text(
-                                '契約開始: ${it.keiyakuDateFrom}',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 「契約中 N 件」「過去 N 件」バッジ。N は商品行数。
+  Widget _buildStatusBadges(_RiyosyaGroup group) {
+    final widgets = <Widget>[];
+    if (group.activeCount > 0) {
+      widgets.add(_badge(
+        '契約中 ${group.activeCount} 件',
+        bg: Colors.blue.shade50,
+        fg: Colors.blue.shade800,
+      ));
+    }
+    if (group.pastCount > 0) {
+      if (widgets.isNotEmpty) widgets.add(const SizedBox(width: 6));
+      widgets.add(_badge(
+        '過去 ${group.pastCount} 件',
+        bg: Colors.grey.shade200,
+        fg: Colors.grey.shade800,
+      ));
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: widgets);
+  }
+
+  Widget _badge(String text, {required Color bg, required Color fg}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: fg),
       ),
     );
   }
@@ -507,14 +481,14 @@ class _KeiyakutyuRiyosyaListScreenState
 class _RiyosyaGroup {
   final int riyosyaId;
   final String riyosyaName;
-  String earliestKeiyakuDateFrom;
-  final List<KeiyakutyuRiyosyaItem> items;
+  final List<RiyosyaSyokaiItem> items;
   _RiyosyaGroup({
     required this.riyosyaId,
     required this.riyosyaName,
-    required this.earliestKeiyakuDateFrom,
     required this.items,
-  });
+  }) : assert(items.isNotEmpty);
+  int get activeCount => items.where((e) => e.isActive).length;
+  int get pastCount => items.length - activeCount;
 }
 
 class _PageNumButton extends StatelessWidget {
