@@ -94,8 +94,17 @@ class _TodayDeliveryCompletedListScreenState
     }
 
     if (_items.isEmpty) {
-      return const Center(
-        child: Text('本日の配送完了はありません。'),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 80),
+          Center(
+            child: Text(
+              '本日の配送完了はありません',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ),
+        ],
       );
     }
 

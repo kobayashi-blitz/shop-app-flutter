@@ -20,7 +20,9 @@ class RentalUriageHistoryService {
 
   /// 担当者単位のレンタル売上月別履歴を取得する。
   ///
-  /// 期間は **過去 12 ヶ月固定** で pcw に要求する。
+  /// 期間は **当月を除く過去 12 ヶ月** をフロント側で確保する。
+  /// pcw 側に 13 ヶ月リクエストして当月行 (まだ月次確定処理が走っていないため
+  /// 常に 0 円) をクライアント側で除外し、結果 12 ヶ月を返す。
   /// データなし月も 0 埋めして DESC で返る。
   /// 累計の対象期間 (period_from / period_to、`YYYY/MM`) も同梱されるので
   /// 履歴画面のヘッダで「対象期間」表示に利用する。
@@ -34,7 +36,7 @@ class RentalUriageHistoryService {
     try {
       res = await _apiClient.post(
         '/api/pcwMobileApi/shop/rental-uriage/monthly',
-        data: {'shop_id': shopId, 'tanto_id': tantoId, 'months': 12},
+        data: {'shop_id': shopId, 'tanto_id': tantoId, 'months': 13},
         options: Options(receiveTimeout: const Duration(seconds: 60)),
       );
     } on DioException catch (e) {
@@ -49,10 +51,13 @@ class RentalUriageHistoryService {
     final periodFrom = (data['period_from'] ?? '').toString();
     final periodTo = (data['period_to'] ?? '').toString();
     final list = (data['months'] as List?) ?? const [];
+    final now = DateTime.now();
+    final currentYm = '${now.year}/${now.month.toString().padLeft(2, '0')}';
     final monthItems = list
         .whereType<Map>()
         .map(
             (e) => RentalUriageMonthItem.fromJson(Map<String, dynamic>.from(e)))
+        .where((m) => m.ym != currentYm)
         .toList();
     return (
       totalkinAll: totalkinAll,
