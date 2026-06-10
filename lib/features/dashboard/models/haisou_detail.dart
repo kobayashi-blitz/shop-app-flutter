@@ -21,6 +21,8 @@ class HaisouDetail {
   final String placeDelivery;
   final String hikkosiAddress;
   final String haisouTantoName;
+  final String haisouTantoTel;
+  final String haisouTantoPhotoUrl;
   final String agentTantoName;
   final String footerComment;
   final bool isDelivered;
@@ -38,6 +40,8 @@ class HaisouDetail {
     required this.placeDelivery,
     required this.hikkosiAddress,
     required this.haisouTantoName,
+    required this.haisouTantoTel,
+    required this.haisouTantoPhotoUrl,
     required this.agentTantoName,
     required this.footerComment,
     required this.isDelivered,
@@ -61,6 +65,11 @@ class HaisouDetail {
       placeDelivery: (detailJson['place_delivery'] ?? '') as String,
       hikkosiAddress: (detailJson['hikkosi_address'] ?? '') as String,
       haisouTantoName: (detailJson['haisou_tanto_name'] ?? '') as String,
+      // tel/photo は pcw が未登録時 null を返す契約。int 等で来ても安全に文字列化
+      // （riyosya_syokai_item.dart 等のコードベース規約 `?.toString() ?? ''` に合わせる）。
+      haisouTantoTel: detailJson['haisou_tanto_tel']?.toString() ?? '',
+      haisouTantoPhotoUrl:
+          detailJson['haisou_tanto_photo_url']?.toString() ?? '',
       agentTantoName: (detailJson['agent_tanto_name'] ?? '') as String,
       footerComment: (detailJson['footer_comment'] ?? '') as String,
       isDelivered: _parseBool(detailJson['is_delivered']),

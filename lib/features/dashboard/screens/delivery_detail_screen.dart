@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/haisou_detail.dart';
 import '../models/tomorrow_delivery_item.dart';
@@ -239,16 +240,159 @@ class DeliveryDetailScreen extends ConsumerWidget {
     );
   }
 
-  /// 配送員のみ表示 (代理店担当は削除)。
+  /// 配送員のみ表示 (代理店担当は削除)。写真 + 氏名 + 電話番号(発信)。
   Widget _buildTantoCard(HaisouDetail d) {
     return _Section(
       title: '担当',
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TantoPhoto(url: d.haisouTantoPhotoUrl),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _InfoRow(
+                  label: '配送員',
+                  value: d.haisouTantoName.isEmpty ? '-' : d.haisouTantoName,
+                ),
+                if (d.haisouTantoTel.isNotEmpty)
+                  _CallablePhoneRow(label: '電話番号', tel: d.haisouTantoTel),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 配送員の電話番号を発信する。端末のダイヤラを番号付きで開く。
+///
+/// `canLaunchUrl` でゲートせず直接 `launchUrl` し、失敗 (戻り値 false / 例外) は
+/// SnackBar で通知する (Android の queries 設定漏れ等にも頑健)。
+Future<void> _dialPhone(BuildContext context, String raw) async {
+  final sanitized = raw.replaceAll(RegExp(r'[^0-9+]'), '');
+  if (sanitized.isEmpty) return; // 空番号で tel: を叩かない
+  final uri = Uri(scheme: 'tel', path: sanitized);
+  try {
+    final ok = await launchUrl(uri);
+    if (!context.mounted) return; // async gap ガード
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('発信できませんでした')),
+      );
+    }
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('発信できませんでした')),
+    );
+  }
+}
+
+/// 配送員の写真。高さ固定 (64) でアスペクト比を維持し、幅は自動 (最大 96)。
+/// 未設定・読込失敗時は人型プレースホルダを表示する。
+class _TantoPhoto extends StatelessWidget {
+  final String url;
+
+  const _TantoPhoto({required this.url});
+
+  static const double _h = 72;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      height: _h,
+      width: _h,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.person, size: 32, color: Colors.grey.shade500),
+    );
+    if (url.isEmpty) return placeholder;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: _h, maxWidth: 108),
+        child: Image.network(
+          url,
+          height: _h,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const SizedBox(
+              height: _h,
+              width: _h,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stack) => placeholder,
+        ),
+      ),
+    );
+  }
+}
+
+/// 電話番号 (ラベル + 値で 1 行フル幅) と、その下の「発信」ボタン。
+///
+/// 番号とボタンを同じ行に並べると長い番号が折り返すため、ボタンは番号の下に置く。
+/// ボタンは塗りつぶし (緑) + アイコンで「押せる」ことが分かるデザインにする。
+class _CallablePhoneRow extends StatelessWidget {
+  final String label;
+  final String tel;
+
+  const _CallablePhoneRow({required this.label, required this.tel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _InfoRow(
-            label: '配送員',
-            value: d.haisouTantoName.isEmpty ? '-' : d.haisouTantoName,
+          // 電話番号: 発信ボタンと同居しないのでフル幅で折り返さない。
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 80,
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                ),
+              ),
+              Expanded(
+                child: Text(tel, style: const TextStyle(fontSize: 14)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 発信ボタン: 番号の下。塗りつぶしでボタンと分かるデザイン。
+          ElevatedButton.icon(
+            onPressed: () => _dialPhone(context, tel),
+            icon: const Icon(Icons.call, size: 18),
+            label: const Text('発信'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              // 文字・アイコンサイズは維持し、余白と最小高さを詰めて小型化。
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ],
       ),
