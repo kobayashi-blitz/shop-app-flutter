@@ -220,6 +220,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               icon: const Icon(Icons.logout),
               onPressed: () async {
                 final navigator = Navigator.of(context);
+                // 誤タップ防止の確認モーダル
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('ログアウト'),
+                    content: const Text('ログアウトしますか？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('ログアウト'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !mounted) return;
+
                 // ログアウト前に FCM トークンを解除（shop_syain_id が prefs にあるうちに）
                 await ref
                     .read(pushNotificationServiceProvider)
