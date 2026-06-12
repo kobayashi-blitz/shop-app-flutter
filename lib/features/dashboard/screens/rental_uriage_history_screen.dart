@@ -8,7 +8,7 @@ import '../providers/rental_uriage_history_provider.dart';
 /// 担当者単位のレンタル売上 月別履歴画面。
 ///
 /// ダッシュボード「レンタル売上（累計）」カードのタップで遷移。
-/// pcw `rental-uriage/monthly` API から **過去 12 ヶ月** の月別合計と累計
+/// pcw `rental-uriage/monthly` API から **当月を除く過去 12 ヶ月** の月別合計と累計
 /// (`totalkin_all` + `period_from` / `period_to`) を取得する。
 class RentalUriageHistoryScreen extends ConsumerStatefulWidget {
   const RentalUriageHistoryScreen({super.key});
@@ -99,11 +99,11 @@ class _RentalUriageHistoryScreenState
         const SizedBox(height: 12),
         if (!hasAnyData)
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
+            padding: EdgeInsets.only(top: 80),
             child: Center(
               child: Text(
                 '売上履歴がありません',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             ),
           )

@@ -15,7 +15,8 @@ class RentalUriageHistoryState {
   final String periodFrom;
   final String periodTo;
 
-  /// 月別履歴 (DESC 順、12 ヶ月固定。データなし月は 0 埋め)。
+  /// 月別履歴 (DESC 順、当月を除く過去 12 ヶ月固定。データなし月は 0 埋め)。
+  /// 当月は月次確定処理 (pcw `m05getuzimenu`) 前は 0 円固定のため表示しない。
   final List<RentalUriageMonthItem> items;
 
   RentalUriageHistoryState({

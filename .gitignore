@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config (per-project secrets / personal アカウントの設定 — コミットしない)
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+# Firebase Admin SDK サービスアカウント鍵（FCM送信用・絶対にコミットしない）
+*-firebase-adminsdk-*.json
+
+# fvm (SDK 実体は ignore、.fvmrc はコミット)
+.fvm/

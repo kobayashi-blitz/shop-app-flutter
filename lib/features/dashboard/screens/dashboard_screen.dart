@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/env/app_env.dart';
+import '../../../core/notifications/push_notification_service.dart';
 import '../models/dashboard_data.dart';
 import '../providers/dashboard_provider.dart';
 import 'placeholder_screen.dart';
@@ -219,6 +220,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               icon: const Icon(Icons.logout),
               onPressed: () async {
                 final navigator = Navigator.of(context);
+                // 誤タップ防止の確認モーダル
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('ログアウト'),
+                    content: const Text('ログアウトしますか？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('ログアウト'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !mounted) return;
+
+                // ログアウト前に FCM トークンを解除（shop_syain_id が prefs にあるうちに）
+                await ref
+                    .read(pushNotificationServiceProvider)
+                    .unregisterToken();
                 await ref.read(authProvider.notifier).logout();
                 if (mounted) {
                   navigator.pushReplacementNamed('/login');
