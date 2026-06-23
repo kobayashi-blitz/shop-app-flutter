@@ -63,7 +63,10 @@ class SinseiNotifier extends StateNotifier<SinseiCreateState> {
   final int shopId;
   final int riyosyaId;
 
-  SinseiNotifier(this._service, this.shopId, this.riyosyaId)
+  /// ログイン中の代理店社員ID（pcw 側でメール本文の申請者名に使用。未ログイン/未取得は null）。
+  final int? shopSyainId;
+
+  SinseiNotifier(this._service, this.shopId, this.riyosyaId, [this.shopSyainId])
       : super(const SinseiCreateState(isLoading: true)) {
     fetchInit();
   }
@@ -117,6 +120,7 @@ class SinseiNotifier extends StateNotifier<SinseiCreateState> {
         rentalHoryuSyohinId: rentalHoryuSyohinId,
         oldHoryuDateFrom: oldHoryuDateFrom,
         oldHoryuDateTo: oldHoryuDateTo,
+        shopSyainId: shopSyainId,
       );
       state = state.copyWith(
         isSubmitting: false,
@@ -142,6 +146,8 @@ final sinseiProvider = StateNotifierProvider.autoDispose
     ref.watch(sinseiServiceProvider),
     args.shopId,
     args.riyosyaId,
+    // ログイン中ユーザーの代理店社員ID（メール本文の申請者名に使用。任意）
+    ref.watch(authProvider).user?.shopSyainId,
   ),
 );
 
