@@ -62,11 +62,13 @@ class SinseiService {
     List<int?>? rentalHoryuSyohinId, // sinsei_kubun=2 のみ
     List<String?>? oldHoryuDateFrom, // sinsei_kubun=2 のみ ('Y-m-d')
     List<String?>? oldHoryuDateTo, // sinsei_kubun=2 のみ
+    int? shopSyainId, // ログイン中の代理店社員ID（pcw 側でメール本文の申請者名に使用。任意）
   }) async {
     final body = <String, dynamic>{
       'shop_id': shopId,
       'riyosya_id': riyosyaId,
       'sinsei_kubun': sinseiKubun,
+      if (shopSyainId != null) 'shop_syain_id': shopSyainId,
       'sinsei_from_date': sinseiFromDate,
       if (sinseiToDate != null && sinseiToDate.isNotEmpty)
         'sinsei_to_date': sinseiToDate,
