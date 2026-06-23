@@ -1,34 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/sinsei_mock_data.dart';
+import '../models/sinsei_models.dart';
+import '../providers/sinsei_provider.dart';
 
 enum SinseiKubun { create, update }
 
-class NyuinHoryuSinseiCreateScreen extends StatefulWidget {
-  final String riyosyaName;
+extension on SinseiKubun {
+  String get apiValue => this == SinseiKubun.create ? '1' : '2';
+}
+
+class NyuinHoryuSinseiCreateScreen extends ConsumerStatefulWidget {
+  final int shopId;
+  final int riyosyaId;
+  final String? riyosyaName;
   final String? riyosyaKana;
 
   const NyuinHoryuSinseiCreateScreen({
     super.key,
-    required this.riyosyaName,
+    required this.shopId,
+    required this.riyosyaId,
+    this.riyosyaName,
     this.riyosyaKana,
   });
 
   @override
-  State<NyuinHoryuSinseiCreateScreen> createState() =>
+  ConsumerState<NyuinHoryuSinseiCreateScreen> createState() =>
       _NyuinHoryuSinseiCreateScreenState();
 }
 
 class _NyuinHoryuSinseiCreateScreenState
-    extends State<NyuinHoryuSinseiCreateScreen> {
+    extends ConsumerState<NyuinHoryuSinseiCreateScreen> {
   SinseiKubun _sinseiKubun = SinseiKubun.create;
   DateTime? _fromDate;
   DateTime? _toDate;
   final TextEditingController _riyuController = TextEditingController();
-  final Set<int> _checkedRentalIds = {
-    for (final r in mockRentalItems) r.rentalId,
-  };
+
+  /// チェックされた rental_id の集合。
+  /// 初期化タイミング:
+  /// - 初回ロード時 → create モードなら rentals 全件、update モードは空
+  /// - sinsei_kubun 切替 → 上記と同じ
+  /// - 変更モードで select_rental_horyu_id を切替 → horyu_orders[] の全件
+  /// それ以外（ソフト再フェッチ）は **保持**。
+  final Set<int> _checkedRentalIds = {};
+
   int? _selectedHoryuId;
+
+  /// 「checkedRentalIds をデータ受信後に再初期化すべきか」のフラグ。
+  /// fetchInit を発火する直前に立て、データ受信後の最初の build で消費する。
+  bool _resetChecksOnNextData = true;
+
+  SinseiProviderArgs get _args =>
+      SinseiProviderArgs(shopId: widget.shopId, riyosyaId: widget.riyosyaId);
 
   @override
   void dispose() {
@@ -71,46 +94,75 @@ class _NyuinHoryuSinseiCreateScreenState
     }
   }
 
-  void _toggleAllChecks() {
+  /// data 受信後に呼ばれ、checkedRentalIds を sinsei_kubun に応じて初期化する。
+  void _applyInitialChecks(SinseiCreateData data) {
+    _checkedRentalIds.clear();
+    if (_sinseiKubun == SinseiKubun.create) {
+      _checkedRentalIds.addAll(data.rentals.map((e) => e.rentalId));
+    } else {
+      _checkedRentalIds.addAll(data.horyuOrders.map((e) => e.rentalId));
+    }
+  }
+
+  void _toggleAllChecks(SinseiCreateData data) {
     setState(() {
-      if (_checkedRentalIds.length == mockRentalItems.length) {
+      final ids = (_sinseiKubun == SinseiKubun.create)
+          ? data.rentals.map((e) => e.rentalId).toSet()
+          : data.horyuOrders.map((e) => e.rentalId).toSet();
+      if (_checkedRentalIds.containsAll(ids) &&
+          _checkedRentalIds.length == ids.length) {
         _checkedRentalIds.clear();
       } else {
         _checkedRentalIds
           ..clear()
-          ..addAll(mockRentalItems.map((e) => e.rentalId));
+          ..addAll(ids);
       }
     });
   }
 
-  void _selectHoryuRecord(MockHoryuRecord record) {
+  void _selectHoryuRecord(SinseiHoryuRecord record) {
     setState(() {
       _selectedHoryuId = record.rentalHoryuId;
-      _fromDate = _parseDate(record.horyuDateFrom);
-      _toDate = _parseDate(record.horyuDateTo);
-      _checkedRentalIds
-        ..clear()
-        ..add(mockRentalItems.first.rentalId); // モック: 該当 1 件
+      _resetChecksOnNextData = true;
     });
+    ref.read(sinseiProvider(_args).notifier).fetchInit(
+          sinseiKubun: SinseiKubun.update.apiValue,
+          selectRentalHoryuId: record.rentalHoryuId,
+        );
   }
 
-  Future<void> _submit() async {
+  void _onSinseiKubunChanged(SinseiKubun v) {
+    setState(() {
+      _sinseiKubun = v;
+      _selectedHoryuId = null;
+      _fromDate = null;
+      _toDate = null;
+      _resetChecksOnNextData = true;
+    });
+    ref.read(sinseiProvider(_args).notifier).fetchInit(sinseiKubun: v.apiValue);
+  }
+
+  /// 変更モードでサーバから取得した「対象保留」の日付を画面に prefill する。
+  void _prefillFromHoryuOrders(SinseiCreateData data) {
+    if (data.horyuOrders.isEmpty) return;
+    final first = data.horyuOrders.first;
+    final f = _parseDate(first.inpHoryuDateFrom);
+    final t = _parseDate(first.inpHoryuDateTo);
+    if (f != null) _fromDate = f;
+    _toDate = t;
+  }
+
+  Future<void> _submit(SinseiCreateData data) async {
     if (_fromDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('開始日を入力してください')),
-      );
+      _showSnack('開始日を入力してください');
       return;
     }
     if (_sinseiKubun == SinseiKubun.create && _checkedRentalIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('商品は一つ以上、選択してください')),
-      );
+      _showSnack('商品は一つ以上、選択してください');
       return;
     }
     if (_sinseiKubun == SinseiKubun.update && _selectedHoryuId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('変更対象の保留期間を選択してください')),
-      );
+      _showSnack('変更対象の保留期間を選択してください');
       return;
     }
 
@@ -131,52 +183,170 @@ class _NyuinHoryuSinseiCreateScreenState
         ],
       ),
     );
-    if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('申請しました（モック）')),
-      );
+    if (ok != true || !mounted) return;
+
+    // 申請ペイロードを組み立てる
+    if (_sinseiKubun == SinseiKubun.create) {
+      final rentals = data.rentals;
+      await ref.read(sinseiProvider(_args).notifier).submit(
+            sinseiKubun: SinseiKubun.create.apiValue,
+            sinseiFromDate: _formatDate(_fromDate!),
+            sinseiToDate: _toDate == null ? null : _formatDate(_toDate!),
+            sinseiRiyu: _riyuController.text,
+            horyucheck: rentals
+                .map((r) => r.rentalId)
+                .where(_checkedRentalIds.contains)
+                .toList(),
+            rentalid: rentals.map((r) => r.rentalId).toList(),
+            tankaflag: rentals.map((r) => r.rentalTankaFlag ?? '').toList(),
+          );
+    } else {
+      // update: horyu_orders[] を対象に rentalid/tankaflag/rental_horyu_syohin_id/old_* を構築
+      final orders = data.horyuOrders;
+      await ref.read(sinseiProvider(_args).notifier).submit(
+            sinseiKubun: SinseiKubun.update.apiValue,
+            sinseiFromDate: _formatDate(_fromDate!),
+            sinseiToDate: _toDate == null ? null : _formatDate(_toDate!),
+            sinseiRiyu: _riyuController.text,
+            horyucheck: orders
+                .map((o) => o.rentalId)
+                .where(_checkedRentalIds.contains)
+                .toList(),
+            rentalid: orders.map((o) => o.rentalId).toList(),
+            tankaflag: orders.map((o) => o.rentalTankaFlag ?? '').toList(),
+            rentalHoryuSyohinId:
+                orders.map((o) => o.rentalHoryuSyohinId).toList(),
+            oldHoryuDateFrom: orders.map((o) => o.oldHoryuDateFrom).toList(),
+            oldHoryuDateTo: orders.map((o) => o.oldHoryuDateTo).toList(),
+          );
     }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(sinseiProvider(_args));
+
+    // データ受信時の副作用処理
+    ref.listen<SinseiCreateState>(sinseiProvider(_args), (prev, next) {
+      // フェッチ完了
+      if (next.data != null && next.data != prev?.data) {
+        setState(() {
+          if (_resetChecksOnNextData) {
+            _applyInitialChecks(next.data!);
+            _resetChecksOnNextData = false;
+          }
+          if (_sinseiKubun == SinseiKubun.update) {
+            _prefillFromHoryuOrders(next.data!);
+          }
+        });
+      }
+      // 送信完了
+      final completedId = next.completedSinseiSyoninId;
+      if (completedId != null && prev?.completedSinseiSyoninId != completedId) {
+        _showSnack('申請しました (ID: $completedId)');
+        Navigator.of(context).pop();
+      }
+      // 送信エラー
+      if (next.submitError != null && next.submitError != prev?.submitError) {
+        _showSnack(next.submitError!);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('入院保留申請'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildHeaderCard(),
-          const SizedBox(height: 16),
-          _buildFormCard(),
-          const SizedBox(height: 16),
-          if (_sinseiKubun == SinseiKubun.create) ..._buildCreateBody(),
-          if (_sinseiKubun == SinseiKubun.update) ..._buildUpdateBody(),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            onPressed: _submit,
-            child: const Text('申請する',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('戻る'),
-          ),
-        ],
-      ),
+      body: _buildBody(state),
     );
   }
 
-  Widget _buildHeaderCard() {
+  Widget _buildBody(SinseiCreateState state) {
+    if (state.isLoading && state.data == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.error != null && state.data == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+              const SizedBox(height: 16),
+              Text(state.error!,
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref
+                    .read(sinseiProvider(_args).notifier)
+                    .fetchInit(sinseiKubun: _sinseiKubun.apiValue),
+                child: const Text('再試行'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final data = state.data;
+    if (data == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildHeaderCard(data),
+            const SizedBox(height: 16),
+            _buildFormCard(),
+            const SizedBox(height: 16),
+            if (_sinseiKubun == SinseiKubun.create) ..._buildCreateBody(data),
+            if (_sinseiKubun == SinseiKubun.update) ..._buildUpdateBody(data),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: state.isSubmitting ? null : () => _submit(data),
+              child: const Text('申請する',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed:
+                  state.isSubmitting ? null : () => Navigator.of(context).pop(),
+              child: const Text('戻る'),
+            ),
+          ],
+        ),
+        // 申請送信中 or 再フェッチ中のオーバーレイ
+        if (state.isSubmitting || (state.isLoading && state.data != null))
+          const ColoredBox(
+            color: Color(0x33000000),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCard(SinseiCreateData data) {
+    final name = data.riyosyaName.isNotEmpty
+        ? data.riyosyaName
+        : (widget.riyosyaName ?? '');
+    final kana = data.riyosyaKana.isNotEmpty
+        ? data.riyosyaKana
+        : (widget.riyosyaKana ?? '');
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -192,9 +362,7 @@ class _NyuinHoryuSinseiCreateScreenState
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 4),
             Text(
-              widget.riyosyaKana == null || widget.riyosyaKana!.isEmpty
-                  ? widget.riyosyaName
-                  : '${widget.riyosyaKana}（${widget.riyosyaName}）',
+              kana.isEmpty ? name : '$kana（$name）',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -230,17 +398,7 @@ class _NyuinHoryuSinseiCreateScreenState
               ],
               onChanged: (v) {
                 if (v == null) return;
-                setState(() {
-                  _sinseiKubun = v;
-                  _selectedHoryuId = null;
-                  if (v == SinseiKubun.create) {
-                    _checkedRentalIds
-                      ..clear()
-                      ..addAll(mockRentalItems.map((e) => e.rentalId));
-                  } else {
-                    _checkedRentalIds.clear();
-                  }
-                });
+                _onSinseiKubunChanged(v);
               },
             ),
             const SizedBox(height: 16),
@@ -296,7 +454,7 @@ class _NyuinHoryuSinseiCreateScreenState
     );
   }
 
-  List<Widget> _buildCreateBody() {
+  List<Widget> _buildCreateBody(SinseiCreateData data) {
     return [
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -304,18 +462,21 @@ class _NyuinHoryuSinseiCreateScreenState
           const Text('保留商品選択',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           OutlinedButton.icon(
-            onPressed: _toggleAllChecks,
+            onPressed: () => _toggleAllChecks(data),
             icon: const Icon(Icons.checklist, size: 18),
             label: const Text('一括 ON/OFF'),
           ),
         ],
       ),
       const SizedBox(height: 8),
-      ...mockRentalItems.map(_buildRentalTile),
+      if (data.rentals.isEmpty)
+        const _EmptyHoryuRow(label: '申請可能なレンタル商品がありません')
+      else
+        ...data.rentals.map(_buildRentalTile),
     ];
   }
 
-  Widget _buildRentalTile(MockRentalItem item) {
+  Widget _buildRentalTile(SinseiRentalItem item) {
     final checked = _checkedRentalIds.contains(item.rentalId);
     return Card(
       elevation: 0,
@@ -368,13 +529,16 @@ class _NyuinHoryuSinseiCreateScreenState
                     'レンタル期間: ${item.keiyakuDateFrom} 〜 ${item.keiyakuDateTo ?? '継続中'}',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
-                  if (item.horyuKikanTexts.isNotEmpty) ...[
+                  if (item.horyuKikan.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    ...item.horyuKikanTexts.map((t) => Text(
-                          '保留期間: $t',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade700),
-                        )),
+                    ...item.horyuKikan.map((k) {
+                      final to = k.horyuDateTo ?? '';
+                      return Text(
+                        '保留期間: ${k.horyuDateFrom} 〜 $to',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade700),
+                      );
+                    }),
                   ],
                 ],
               ),
@@ -385,48 +549,119 @@ class _NyuinHoryuSinseiCreateScreenState
     );
   }
 
-  List<Widget> _buildUpdateBody() {
-    final selected = _selectedHoryuId == null
-        ? null
-        : [...mockOnHoryuRecords, ...mockOffHoryuRecords]
-            .where((r) => r.rentalHoryuId == _selectedHoryuId)
-            .firstOrNull;
+  Widget _buildHoryuOrderTile(SinseiHoryuOrder order) {
+    final checked = _checkedRentalIds.contains(order.rentalId);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: checked,
+              onChanged: (v) {
+                setState(() {
+                  if (v == true) {
+                    _checkedRentalIds.add(order.rentalId);
+                  } else {
+                    _checkedRentalIds.remove(order.rentalId);
+                  }
+                });
+              },
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(order.rentalNo,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.indigo.shade800)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(order.syohinName,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'レンタル期間: ${order.keiyakuDateFrom} 〜 ${order.keiyakuDateTo ?? '継続中'}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '保留期間: ${order.horyuDateFrom} 〜 ${order.horyuDateTo ?? ''}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildUpdateBody(SinseiCreateData data) {
     return [
       const Text('入院保留中',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
-      if (mockOnHoryuRecords.isEmpty)
+      if (data.onhoryuList.isEmpty)
         const _EmptyHoryuRow(label: '入院保留中の期間はありません')
       else
-        ...mockOnHoryuRecords.map(_buildHoryuRow),
+        ...data.onhoryuList.map(_buildHoryuRow),
       const SizedBox(height: 16),
       const Text('入院保留履歴',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
-      if (mockOffHoryuRecords.isEmpty)
+      if (data.offhoryuList.isEmpty)
         const _EmptyHoryuRow(label: '入院保留履歴はありません')
       else
-        ...mockOffHoryuRecords.map(_buildHoryuRow),
-      if (selected != null) ...[
+        ...data.offhoryuList.map(_buildHoryuRow),
+      if (_selectedHoryuId != null && data.horyuOrders.isNotEmpty) ...[
         const SizedBox(height: 16),
-        const Text('変更対象商品',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('変更対象商品',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            OutlinedButton.icon(
+              onPressed: () => _toggleAllChecks(data),
+              icon: const Icon(Icons.checklist, size: 18),
+              label: const Text('一括 ON/OFF'),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
-        _buildRentalTile(mockRentalItems.first),
+        ...data.horyuOrders.map(_buildHoryuOrderTile),
       ],
     ];
   }
 
-  Widget _buildHoryuRow(MockHoryuRecord r) {
+  Widget _buildHoryuRow(SinseiHoryuRecord r) {
     final selected = _selectedHoryuId == r.rentalHoryuId;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected
-              ? Colors.indigo.shade400
-              : Colors.grey.withOpacity(0.2),
+          color:
+              selected ? Colors.indigo.shade400 : Colors.grey.withOpacity(0.2),
           width: selected ? 1.4 : 1,
         ),
       ),
@@ -444,16 +679,14 @@ class _NyuinHoryuSinseiCreateScreenState
                   ),
                   Text(
                     '入力日: ${r.inputDate}${r.isPending ? ' / 申請中' : ''}',
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                 ],
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    selected ? Colors.indigo : Colors.red.shade700,
+                backgroundColor: selected ? Colors.indigo : Colors.red.shade700,
                 foregroundColor: Colors.white,
               ),
               onPressed: () => _selectHoryuRecord(r),

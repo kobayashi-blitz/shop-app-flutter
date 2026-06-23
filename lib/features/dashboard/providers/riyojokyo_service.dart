@@ -7,6 +7,7 @@ import '../models/keiyakutyu_riyosya_item.dart';
 import '../models/monthly_order_item.dart';
 import '../models/nyuin_horyu_item.dart';
 import '../models/rental_syohin_item.dart';
+import '../models/riyosya_syokai_item.dart';
 import '../models/tyoki_demo_item.dart';
 
 class RiyojokyoService {
@@ -15,6 +16,11 @@ class RiyojokyoService {
   RiyojokyoService(this._apiClient);
 
   /// 件数系の共通呼び出し。result == '1' なら count を、'2' (空) なら 0 を返す。
+  ///
+  /// 設計上、**API 障害 (DioException) も真の 0 件もすべて 0 にフォールバック** する。
+  /// ダッシュボードの件数カードが画面エラーで埋まるより、暫定で 0 を見せて他カードの
+  /// 取得を続行する方が UX 上望ましいため。区別が必要になる場合は呼出し側で
+  /// 例外を再 throw する別メソッドを切ること。
   Future<int> _fetchCount(String path, int shopId, int tantoId) async {
     try {
       final res = await _apiClient.post(
@@ -33,30 +39,69 @@ class RiyojokyoService {
     }
   }
 
-  /// totalkin (金額) 系の共通呼び出し。pcw 側 SQL が重く 504 になるので 3 秒で諦めて 0 にフォールバック。
-  Future<int> _fetchTotalKin(String path, int shopId, int tantoId) async {
+  /// totalkin (金額) 系の共通呼び出し。pcw 側 SQL が重いため timeout 30 秒。
+  /// 呼出側で `Future.wait` の並列 API から分離して独立 future にすることで
+  /// 他カード表示をブロックしない設計とする (dashboard_provider 参照)。
+  ///
+  /// 成功時は数値、失敗 (timeout/DioException/result != '1'/パース不能) 時は `null`。
+  /// 呼出側で実値 0 と取得失敗を区別し、UI で「-」表示等に分岐するため null を返す。
+  Future<int?> _fetchTotalKin(String path, int shopId, int tantoId) async {
     try {
       final res = await _apiClient.post(
         path,
         data: {'shop_id': shopId, 'tanto_id': tantoId},
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 30));
       final data = _asMap(res.data);
-      if (data['result'] != '1') return 0;
+      if (data['result'] != '1') return null;
       final raw = data['totalkin'];
       if (raw is int) return raw;
       if (raw is num) return raw.toInt();
-      return int.tryParse('$raw') ?? 0;
+      return int.tryParse('$raw');
     } on TimeoutException {
-      return 0;
+      return null;
+    } on DioException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 配送予定件数の「特定日分」だけを取得する。
+  ///
+  /// pcw 側 `shop/haisouyotei` API は本日〜翌日 2 日合算しか返さないので、
+  /// 詳細リスト (`shop/haisouyotei/syosai`) を取って `kibou_date == targetDate`
+  /// の件数をクライアント側でカウントする。
+  ///
+  /// [targetDate] は端末ローカル時刻基準の DateTime。`Y/M/D` 形式に変換して
+  /// API レスポンスの `kibou_date` (Y/m/d) と比較する。
+  Future<int> haisouYoteiCountForDate({
+    required int shopId,
+    required int tantoId,
+    required DateTime targetDate,
+  }) async {
+    final ymd =
+        '${targetDate.year}/${targetDate.month.toString().padLeft(2, '0')}/'
+        '${targetDate.day.toString().padLeft(2, '0')}';
+    try {
+      final res = await _apiClient.post(
+        '/api/pcwMobileApi/shop/haisouyotei/syosai',
+        data: {'shop_id': shopId, 'tanto_id': tantoId},
+      );
+      final data = _asMap(res.data);
+      if (data['result'] != '1') return 0;
+      final list = (data['details'] as List?) ?? const [];
+      return list.where((e) {
+        if (e is Map) {
+          return e['kibou_date'] == ymd;
+        }
+        return false;
+      }).length;
     } on DioException {
       return 0;
     } catch (_) {
       return 0;
     }
   }
-
-  Future<int> haisouYoteiCount({required int shopId, required int tantoId}) =>
-      _fetchCount('/api/pcwMobileApi/shop/haisouyotei', shopId, tantoId);
 
   Future<int> togetuSinkiOrderCount(
           {required int shopId, required int tantoId}) =>
@@ -78,8 +123,15 @@ class RiyojokyoService {
           {required int shopId, required int tantoId}) =>
       _fetchCount('/api/pcwMobileApi/shop/nyuin-horyu-syohin', shopId, tantoId);
 
-  /// レンタル売上累計。pcw 側 SQL が重く 504 になることがあるので失敗時は 0 を返す。
-  Future<int> rentalUriageTotal({required int shopId, required int tantoId}) =>
+  /// 本日の配送完了件数。pcw 側 `haisou-kanryo` は配送種別ごとに完了日カラム = today
+  /// (預入系は r31.updated_at で代用) でカウントを返す。`_fetchCount` パターンで
+  /// 失敗時は 0 フォールバック。
+  Future<int> haisouKanryoCount({required int shopId, required int tantoId}) =>
+      _fetchCount('/api/pcwMobileApi/shop/haisou-kanryo', shopId, tantoId);
+
+  /// レンタル売上累計。pcw 側 SQL が重く 504 になることがあるので失敗時は null を返す。
+  /// 呼出側で実値 0 と取得失敗を区別する。
+  Future<int?> rentalUriageTotal({required int shopId, required int tantoId}) =>
       _fetchTotalKin('/api/pcwMobileApi/shop/rental-uriage', shopId, tantoId);
 
   /// 当月新規受注詳細
@@ -136,6 +188,24 @@ class RiyojokyoService {
       '契約中利用者詳細',
     );
     return list.map((e) => KeiyakutyuRiyosyaItem.fromJson(e)).toList();
+  }
+
+  /// 利用者照会（過去契約含む全利用者の詳細＋基本情報）。
+  ///
+  /// pcw 側で「契約として意味のあるステータス」のみフィルタ済み
+  /// (NOHIN_ZUMI=30 / KEIYAKU_CHU=40 / HENKYAKU_MACHI=50 / 同 COMPLETE=55,57)。
+  /// 商品行単位で m41 基本情報を含むため、画面側で riyosya_id で groupBy する。
+  Future<List<RiyosyaSyokaiItem>> riyosyaSyokaiDetails({
+    required int shopId,
+    required int tantoId,
+  }) async {
+    final list = await _fetchDetails(
+      '/api/pcwMobileApi/shop/riyosya-syokai',
+      shopId,
+      tantoId,
+      '利用者照会',
+    );
+    return list.map((e) => RiyosyaSyokaiItem.fromJson(e)).toList();
   }
 
   /// 長期デモ詳細（API は 30日以上のレコードを返す。3ヶ月以上はフロントで絞り込み）

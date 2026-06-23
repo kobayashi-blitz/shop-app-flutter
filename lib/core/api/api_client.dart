@@ -3,8 +3,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   late final Dio _dio;
-  // adb reverse tcp:8080 tcp:8080 で実機からも localhost に届く
-  static const String baseUrl = 'http://localhost:8080';
+
+  /// API 接続先 base URL。
+  ///
+  /// ビルド時に `--dart-define=API_BASE_URL=...` で外部注入する。
+  /// 未指定の場合は開発用の localhost にフォールバック。
+  /// 値はコンパイル時定数のため、切替には hot restart ではなく再ビルドが必要。
+  ///
+  ///   flutter run                                                            (Local)
+  ///   flutter run --dart-define=API_BASE_URL=https://fatest.pcw-system.com   (Test)
+  ///   adb reverse tcp:8080 tcp:8080  ← Local + 実機 Android のとき
+  static const String _defaultBaseUrl = 'http://localhost:8080';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: _defaultBaseUrl,
+  );
 
   ApiClient() {
     _dio = Dio(
@@ -36,51 +49,19 @@ class ApiClient {
     );
   }
 
-  /// 代理店担当者ログインAPI
-  Future<Response> spLogin({
-    required String shopId,
-    required String loginId,
-    required String loginPassword,
-  }) async {
-    try {
-      return await _dio.post(
-        '/api/sp/login',
-        data: {
-          'shop_id': shopId,
-          'login_id': loginId,
-          'login_password': loginPassword,
-        },
-      );
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// 明日の配送件数取得API
-  Future<Response> fetchSpTomorrowDeliveryCount({
-    required String shopId,
-  }) async {
-    try {
-      return await _dio.post(
-        '/api/pcwMobileApi/sp-tomorrow-delivery-count',
-        data: {
-          'shop_id': shopId,
-        },
-      );
-    } catch (e) {
-      rethrow;
-    }
-  }
-
   /// 汎用 POST メソッド
+  ///
+  /// [options] で個別 API ごとの receiveTimeout 等を上書き可能。
   Future<Response> post(
     String path, {
     Map<String, dynamic>? data,
+    Options? options,
   }) async {
     try {
       return await _dio.post(
         path,
         data: data,
+        options: options,
       );
     } catch (e) {
       rethrow;

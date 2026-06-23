@@ -15,19 +15,72 @@ class DenpyoSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
+  static const int _perPage = 50;
+
   final Set<String> _selectedTypes = {'1'}; // デフォルト：レンタル納品伝票
   DateTime? _hakkoubi;
   bool _isSearching = false;
+  bool _isPaging = false;
   bool _isOpening = false;
   String? _error;
   int _total = 0;
+  int _currentPage = 1;
+  int _totalPages = 1;
   List<DenpyoSearchItem> _items = [];
   bool _hasSearched = false;
+  bool _sortAsc = false; // false=新しい順(デフォルト、pcw 現状と一致), true=古い順
+  bool _filtersExpanded = true; // 初期は開いている、ユーザの手動開閉のみ
 
-  Future<void> _search() async {
+  /// 現ページの _items を `denpyoDate` で並び替える。
+  /// denpyoDate は "YYYY年MM月DD日" (zero-padded) なので文字列比較で日付順になる。
+  /// 空文字 (日付不明) は昇順/降順どちらでも末尾に固定。
+  void _applySort() {
+    _items.sort((a, b) {
+      if (a.denpyoDate.isEmpty && b.denpyoDate.isEmpty) return 0;
+      if (a.denpyoDate.isEmpty) return 1;
+      if (b.denpyoDate.isEmpty) return -1;
+      return _sortAsc
+          ? a.denpyoDate.compareTo(b.denpyoDate)
+          : b.denpyoDate.compareTo(a.denpyoDate);
+    });
+  }
+
+  void _onSortChanged(bool asc) {
+    if (_sortAsc == asc) return;
+    setState(() {
+      _sortAsc = asc;
+      _applySort();
+    });
+  }
+
+  Future<void> _fetch(int page) async {
     final user = ref.read(authProvider).user;
     final shopId = user?.shopId;
     if (shopId == null) {
+      throw Exception('ログイン情報が取得できませんでした。');
+    }
+    final service = ref.read(voucherServiceProvider);
+    final hakkoubi =
+        _hakkoubi == null ? null : DateFormat('yyyy-MM-dd').format(_hakkoubi!);
+    final res = await service.searchDenpyo(
+      shopId: shopId,
+      denpyoSyurui: _selectedTypes.toList(),
+      hakkoubi: hakkoubi,
+      page: page,
+      perPage: _perPage,
+    );
+    setState(() {
+      _items = res.items;
+      _applySort();
+      _total = res.total;
+      _currentPage = res.page;
+      _totalPages = (res.total / _perPage).ceil().clamp(1, 9999);
+    });
+  }
+
+  Future<void> _search() async {
+    final user = ref.read(authProvider).user;
+    if (user?.shopId == null) {
       setState(() => _error = 'ログイン情報が取得できませんでした。');
       return;
     }
@@ -40,29 +93,31 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       _isSearching = true;
       _error = null;
       _hasSearched = true;
+      _currentPage = 1;
     });
     try {
-      final service = ref.read(voucherServiceProvider);
-      final hakkoubi = _hakkoubi == null
-          ? null
-          : DateFormat('yyyy-MM-dd').format(_hakkoubi!);
-      final res = await service.searchDenpyo(
-        shopId: shopId,
-        denpyoSyurui: _selectedTypes.toList(),
-        hakkoubi: hakkoubi,
-        page: 1,
-        perPage: 100,
-      );
-      setState(() {
-        _items = res.items;
-        _total = res.total;
-        _isSearching = false;
-      });
+      await _fetch(1);
     } catch (_) {
-      setState(() {
-        _isSearching = false;
-        _error = '伝票検索に失敗しました';
-      });
+      setState(() => _error = '伝票検索に失敗しました');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _goToPage(int newPage) async {
+    final clamped = newPage.clamp(1, _totalPages);
+    if (clamped == _currentPage) return;
+    setState(() => _isPaging = true);
+    try {
+      await _fetch(clamped);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ページ取得に失敗しました')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPaging = false);
     }
   }
 
@@ -117,92 +172,207 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       ),
       body: Column(
         children: [
-          _buildFilters(),
+          _buildFilterHeader(),
+          _buildFiltersCollapsible(),
+          _buildResultSummary(),
           const Divider(height: 1),
           Expanded(child: _buildListBody()),
+          _buildPager(),
         ],
       ),
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildPager() {
+    if (!_hasSearched || _items.isEmpty) return const SizedBox.shrink();
+
+    final pageNums = _calcWindowedPages(_currentPage, _totalPages);
+    final canPrev = !_isPaging && !_isSearching && _currentPage > 1;
+    final canNext = !_isPaging && !_isSearching && _currentPage < _totalPages;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            onPressed: canPrev ? () => _goToPage(_currentPage - 1) : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          ...pageNums.map((p) => _PageNumButton(
+                page: p,
+                isCurrent: p == _currentPage,
+                enabled: !_isPaging && !_isSearching,
+                onTap: () => _goToPage(p),
+              )),
+          IconButton(
+            onPressed: canNext ? () => _goToPage(_currentPage + 1) : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 現在ページを中心に前後 2 ページずつ、最大 5 番号を返す。
+  /// 端では片側を多めに表示し常に 5 個 (足りなければ可能な分) を維持。
+  List<int> _calcWindowedPages(int current, int total) {
+    if (total <= 5) return List.generate(total, (i) => i + 1);
+    int start = current - 2;
+    int end = current + 2;
+    if (start < 1) {
+      end += (1 - start);
+      start = 1;
+    }
+    if (end > total) {
+      start -= (end - total);
+      end = total;
+    }
+    start = start.clamp(1, total);
+    return List.generate(end - start + 1, (i) => start + i);
+  }
+
+  Widget _buildFilterHeader() {
+    return InkWell(
+      onTap: (_isSearching || _isPaging)
+          ? null
+          : () => setState(() => _filtersExpanded = !_filtersExpanded),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            Icon(Icons.filter_list, size: 18, color: Colors.indigo.shade700),
+            const SizedBox(width: 8),
+            const Text('検索条件',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            AnimatedRotation(
+              turns: _filtersExpanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.expand_more, color: Colors.grey.shade700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersCollapsible() {
     final dateLabel = _hakkoubi == null
         ? '希望日（指定なし）'
         : DateFormat('yyyy/MM/dd').format(_hakkoubi!);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('伝票種類',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          Wrap(
-            spacing: 8,
-            children: DenpyoTypeOption.all.map((opt) {
-              final selected = _selectedTypes.contains(opt.code);
-              return FilterChip(
-                label: Text(opt.label, style: const TextStyle(fontSize: 12)),
-                selected: selected,
-                onSelected: _isSearching
-                    ? null
-                    : (v) {
-                        setState(() {
-                          if (v) {
-                            _selectedTypes.add(opt.code);
-                          } else {
-                            _selectedTypes.remove(opt.code);
-                          }
-                        });
-                      },
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isSearching ? null : _pickDate,
-                  icon: const Icon(Icons.event, size: 18),
-                  label: Text(dateLabel),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: ClipRect(
+        child: Visibility(
+          visible: _filtersExpanded,
+          // 選択状態は `_selectedTypes` / `_sortAsc` / `_hakkoubi` クラスフィールドで
+          // 保持済なので state 維持目的では不要。AnimatedSize の高さ補間が安定する
+          // よう Widget tree を残すために true。
+          maintainState: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('伝票種類',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                Wrap(
+                  spacing: 8,
+                  children: DenpyoTypeOption.all.map((opt) {
+                    final selected = _selectedTypes.contains(opt.code);
+                    return FilterChip(
+                      label:
+                          Text(opt.label, style: const TextStyle(fontSize: 12)),
+                      selected: selected,
+                      onSelected: (_isSearching || _isPaging)
+                          ? null
+                          : (v) {
+                              setState(() {
+                                if (v) {
+                                  _selectedTypes.add(opt.code);
+                                } else {
+                                  _selectedTypes.remove(opt.code);
+                                }
+                              });
+                            },
+                    );
+                  }).toList(),
                 ),
-              ),
-              if (_hakkoubi != null)
-                IconButton(
-                  onPressed: _isSearching
+                const SizedBox(height: 8),
+                const Text('並び順',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(value: false, label: Text('新しい順')),
+                    ButtonSegment<bool>(value: true, label: Text('古い順')),
+                  ],
+                  selected: {_sortAsc},
+                  onSelectionChanged: (_isSearching || _isPaging)
                       ? null
-                      : () => setState(() => _hakkoubi = null),
-                  icon: const Icon(Icons.clear, size: 18),
-                  tooltip: '希望日をクリア',
+                      : (set) => _onSortChanged(set.first),
+                  showSelectedIcon: false,
                 ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: _isSearching ? null : _search,
-                icon: _isSearching
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.search, size: 18),
-                label: const Text('検索'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  foregroundColor: Colors.white,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            (_isSearching || _isPaging) ? null : _pickDate,
+                        icon: const Icon(Icons.event, size: 18),
+                        label: Text(dateLabel),
+                      ),
+                    ),
+                    if (_hakkoubi != null)
+                      IconButton(
+                        onPressed: (_isSearching || _isPaging)
+                            ? null
+                            : () => setState(() => _hakkoubi = null),
+                        icon: const Icon(Icons.clear, size: 18),
+                        tooltip: '希望日をクリア',
+                      ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: (_isSearching || _isPaging) ? null : _search,
+                      icon: _isSearching
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.search, size: 18),
+                      label: const Text('検索'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          if (_hasSearched && !_isSearching && _error == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '$_total 件 (上位 ${_items.length} 件を表示)',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
+              ],
             ),
-        ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultSummary() {
+    if (!_hasSearched || _isSearching || _error != null || _items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Text(
+        '$_total 件中 ${(_currentPage - 1) * _perPage + 1}-${(_currentPage - 1) * _perPage + _items.length} 件目',
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
       ),
     );
   }
@@ -277,7 +447,7 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: _isOpening ? null : () => _openPdf(item),
+        onTap: (_isOpening || _isPaging) ? null : () => _openPdf(item),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           child: Column(
@@ -355,6 +525,44 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PageNumButton extends StatelessWidget {
+  final int page;
+  final bool isCurrent;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _PageNumButton({
+    required this.page,
+    required this.isCurrent,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: TextButton(
+          onPressed: (enabled && !isCurrent) ? onTap : null,
+          style: TextButton.styleFrom(
+            backgroundColor: isCurrent ? Colors.indigo : null,
+            foregroundColor: isCurrent ? Colors.white : Colors.indigo,
+            disabledForegroundColor:
+                isCurrent ? Colors.white : Colors.grey.shade400,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: EdgeInsets.zero,
+          ),
+          child: Text('$page'),
         ),
       ),
     );

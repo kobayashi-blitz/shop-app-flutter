@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/tomorrow_delivery_item.dart';
 import '../providers/tomorrow_delivery_service.dart';
+import '../widgets/delivery_list_tile.dart';
 import 'delivery_detail_screen.dart';
 
 class TodayDeliveryCompletedListScreen extends ConsumerStatefulWidget {
@@ -29,7 +29,7 @@ class _TodayDeliveryCompletedListScreenState
 
   Future<void> _load() async {
     try {
-      // ログインユーザーから shop_id を取得
+      // ログインユーザーから shop_id / tantoId(shopSyainId) を取得
       final authState = ref.read(authProvider);
       final loginUser = authState.user;
       final shopId = loginUser?.shopId;
@@ -42,11 +42,15 @@ class _TodayDeliveryCompletedListScreenState
         return;
       }
 
+      final tantoId = loginUser?.shopSyainId ?? 0;
+
       final apiClient = ref.read(apiClientProvider);
       final service = TomorrowDeliveryService(apiClient);
 
       final list = await service.fetchTodayCompletedList(
-          shopId: shopId /*, targetDate: 任意 */);
+        shopId: shopId,
+        tantoId: tantoId,
+      );
 
       setState(() {
         _items = list;
@@ -55,7 +59,9 @@ class _TodayDeliveryCompletedListScreenState
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        _error = e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : '本日配送完了の取得に失敗しました';
       });
     }
   }
@@ -88,8 +94,17 @@ class _TodayDeliveryCompletedListScreenState
     }
 
     if (_items.isEmpty) {
-      return const Center(
-        child: Text('本日の配送完了はありません。'),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 80),
+          Center(
+            child: Text(
+              '本日の配送完了はありません',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ),
+        ],
       );
     }
 
@@ -100,117 +115,9 @@ class _TodayDeliveryCompletedListScreenState
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = _items[index];
-
-        return InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => DeliveryDetailScreen(
-                  item: item,
-                  mode: DeliveryDetailMode.completed,
-                ),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 上段: 区分 + 日時 + 担当配送員
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.indigo.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.kubun, // レンタル / 販売 など
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            // 日時
-                            '${item.deliveryDate ?? ''} ${item.deliveryTime ?? ''}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '担当配送員: ${item.haisouTantoName ?? '未定'}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 利用者名
-                Text(
-                  item.customerName ?? '',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                // 住所
-                Text(
-                  item.address ?? '',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                // 商品名
-                Text(
-                  item.itemName ?? '',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return DeliveryListTile(
+          item: item,
+          detailMode: DeliveryDetailMode.completed,
         );
       },
     );
