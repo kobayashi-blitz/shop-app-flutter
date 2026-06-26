@@ -52,3 +52,12 @@ app.*.map.json
 
 # fvm (SDK 実体は ignore、.fvmrc はコミット)
 .fvm/
+
+# Android リリース署名（keystore とパスワード — 絶対にコミットしない）
+/android/key.properties
+**/*.jks
+**/*.keystore
+# iOS 署名（証明書・プロビジョニング・APNs キー）
+*.p12
+*.mobileprovision
+*.p8
