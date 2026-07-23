@@ -23,19 +23,40 @@ class DeliveryDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncDetail = ref.watch(haisouDetailProvider(item.id));
-
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: Text(_isCompleted ? '配送完了 詳細' : '配送予定 詳細'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
-      body: asyncDetail.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _buildErrorBody(context, ref, e),
-        data: (detail) => _buildBody(detail),
-      ),
+      body: _buildContent(context, ref),
+    );
+    return scaffold;
+  }
+
+  Widget _buildContent(BuildContext context, WidgetRef ref) {
+    // 受付単位で一意化するには 配送ID・受付ID・区分 が揃っている必要がある。
+    // どれかが欠けると pcw 側 `!empty($order_id)` を通らず先頭受付へ静かにフォールバックするため、
+    // ここで弾いてエラー表示する（意図しない別受付の詳細を開かせない）。
+    if (item.id <= 0 || item.haisouId <= 0 || item.kubunCode.isEmpty) {
+      return _buildErrorBody(
+        context,
+        ref,
+        Exception('配送情報が不完全なため詳細を表示できません。'),
+      );
+    }
+
+    final key = (
+      haisouId: item.haisouId,
+      orderId: item.id,
+      kubun: item.kubunCode,
+    );
+    final asyncDetail = ref.watch(haisouDetailProvider(key));
+
+    return asyncDetail.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _buildErrorBody(context, ref, e),
+      data: (detail) => _buildBody(detail),
     );
   }
 
@@ -56,7 +77,19 @@ class DeliveryDetailScreen extends ConsumerWidget {
                 textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.invalidate(haisouDetailProvider(item.id)),
+              onPressed: () {
+                // データ不備で弾いている場合は provider を watch していないので、
+                // 有効なキーのときだけ invalidate する（無効時は rebuild で再判定）。
+                if (item.id > 0 &&
+                    item.haisouId > 0 &&
+                    item.kubunCode.isNotEmpty) {
+                  ref.invalidate(haisouDetailProvider((
+                    haisouId: item.haisouId,
+                    orderId: item.id,
+                    kubun: item.kubunCode,
+                  )));
+                }
+              },
               child: const Text('再読み込み'),
             ),
           ],

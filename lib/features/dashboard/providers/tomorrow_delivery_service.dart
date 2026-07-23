@@ -52,8 +52,8 @@ class TomorrowDeliveryService {
   /// 「本日配送完了一覧」を pcw `haisou-kanryo/syosai` から取得する。
   ///
   /// pcw 側で完了日 = today で絞っているため、クライアント側で日付フィルタは不要。
-  /// 配送単位 (`hs1.haisou_id`) に集約済みのため、1 配送 = 1 行で返る
-  /// (件数 API と完全に一致)。
+  /// **受付単位** (`hs3.tbl_id`) に集約済みのため、1 受付 = 1 行で返る（PR #3036）。
+  /// 合積み配送は同じ `haisou_id` を持つ複数行になる。件数 API も受付数で一致する。
   ///
   /// 異常 (DioException, result != '1') は **例外を throw**。
   Future<List<TomorrowDeliveryItem>> fetchTodayCompletedList({
