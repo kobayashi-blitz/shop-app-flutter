@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/legal_links.dart';
 import '../../../core/notifications/push_notification_service.dart';
+import '../../../core/utils/external_launch.dart';
 import '../providers/auth_provider.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 
@@ -157,6 +159,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'ログイン',
                             style: TextStyle(fontSize: 16),
                           ),
+                  ),
+                  const SizedBox(height: 24),
+                  // アカウント発行導線（自己登録は無く、運営が発行する運用）。
+                  Text(
+                    'ログインID・パスワードは運営より発行されます。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: authState.isLoading
+                        ? null
+                        : () => launchExternalUrl(
+                              context,
+                              LegalLinks.accountRequestUrl,
+                            ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('アカウント発行のお問い合わせ'),
                   ),
                 ],
               ),
