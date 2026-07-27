@@ -17,6 +17,7 @@ import 'tyoki_demo_list_screen.dart';
 import 'rental_uriage_history_screen.dart';
 import 'riyosya_syokai_list_screen.dart';
 import '../../voucher/screens/voucher_hub_screen.dart';
+import '../../user/screens/my_page_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -133,58 +134,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  void _showProfileDialog(dynamic data) {
-    if (data == null || data.user == null) {
-      return;
-    }
-
-    final shopName = data.user.shopName ?? '';
-    final staffName = data.user.shopSyainName ?? '';
-
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'ログインユーザー',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (shopName.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    shopName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              if (staffName.isNotEmpty)
-                Text(
-                  '$staffName 様',
-                  style: const TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('閉じる'),
-            ),
-          ],
-        );
-      },
+  void _openMyPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MyPageScreen()),
     );
   }
 
@@ -252,9 +204,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.person),
-              onPressed: () {
-                _showProfileDialog(dashboardState.data);
-              },
+              onPressed: _openMyPage,
             ),
           ],
           bottom: const TabBar(
