@@ -11,7 +11,8 @@
 情報セクションを追加する。
 
 ## スコープ
-- **含む**: プロフィール表示のページ化、情報セクション（ポリシー/規約/データ削除/バージョン）。
+- **含む**: プロフィール表示のページ化、情報セクション（ポリシー/規約/データ削除/バージョン）、
+  **ログイン画面のアカウント発行導線**（発行申請 URL を外部ブラウザで開く）。
 - **含まない**: ログアウトの移設（AppBar に据え置き）、通知設定等の将来機能、OSSライセンス表記。
 
 ## 画面 / 導線
@@ -36,10 +37,17 @@
 - **バージョン**: `package_info_plus` を追加し `PackageInfo.fromPlatform()` で `version (build buildNumber)` を表示。
 - レイヤー: `MyPageScreen` は表示のみ。データは既存 `authProvider` から取得（Dio 直叩きなし）。architecture.md 準拠。
 
+## ログイン画面のアカウント発行導線
+- `login_screen.dart` のログインボタン下にフッターを追加:
+  - 注記テキスト: 「ログインID・パスワードは運営より発行されます。」
+  - タップ導線: 「アカウント発行のお問い合わせ」→ 外部ブラウザで**発行申請 URL** を開く（`url_launcher`, external。プレースホルダ開始）。
+- 起動失敗時は SnackBar 通知（マイページの情報リンクと同じ頑健な launch）。
+
 ## ファイル変更
 - 追加: `lib/features/user/screens/my_page_screen.dart`
 - 追加: `lib/core/constants/legal_links.dart`
 - 変更: `lib/features/dashboard/screens/dashboard_screen.dart`（`_showProfileDialog` 撤去 → `MyPageScreen` 遷移）
+- 変更: `lib/features/auth/screens/login_screen.dart`（アカウント発行導線フッター追加）
 - 変更: `pubspec.yaml` / `pubspec.lock`（`package_info_plus` 追加）
 
 ## テスト計画
