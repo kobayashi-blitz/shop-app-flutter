@@ -1,25 +1,21 @@
 /// 外部リンク・問い合わせ先の集約。
 ///
 /// これらは機密情報ではないため定数直書きでよい（security.md 準拠）。
-/// TODO(申請): 実値が確定次第、以下のプレースホルダを差し替える。
-/// - プライバシーポリシー / 利用規約 の URL は Play/App Store の掲載 URL と同一を想定。
-/// - アカウント発行・データ削除の窓口は運営の実連絡先に差し替える。
+/// 利用規約は v1 では用意しないため定数を持たない（マイページの導線も非表示）。
+/// 規約を用意したら定数と ListTile を復活させること。
 class LegalLinks {
   LegalLinks._();
 
   /// プライバシーポリシー（公開ホスト URL）。
+  /// Play Console / App Store Connect の掲載欄にも同一 URL を登録する。
   static const String privacyPolicyUrl =
-      'https://example.com/privacy'; // TODO(申請): 実 URL
+      'https://primecare-west.com/privacy_policy.html';
 
-  /// 利用規約（公開ホスト URL）。
-  static const String termsOfServiceUrl =
-      'https://example.com/terms'; // TODO(申請): 実 URL
-
-  /// アカウント発行の申請フォーム/案内ページ（外部ブラウザで開く）。
-  static const String accountRequestUrl =
-      'https://example.com/account-request'; // TODO(申請): 実 URL
-
-  /// データ削除のお問い合わせ先メールアドレス（mailto で開く）。
-  static const String dataDeletionEmail =
-      'support@example.com'; // TODO(申請): 実アドレス
+  /// 問い合わせフォーム（外部ブラウザで開く）。
+  ///
+  /// アカウント発行の依頼とデータ削除の請求は、いずれもこのフォームで受け付ける。
+  /// メーラー未設定の端末でも開けるよう mailto ではなく Web フォームにしている。
+  /// プライバシーポリシー第11項の問い合わせ窓口の記載と一致させること
+  /// （アプリの導線とポリシーが食い違うと審査で指摘される）。
+  static const String contactFormUrl = 'https://primecare-west.com/contact/';
 }

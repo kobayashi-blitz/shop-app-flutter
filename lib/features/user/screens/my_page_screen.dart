@@ -36,21 +36,10 @@ class MyPageScreen extends ConsumerWidget {
                 launchExternalUrl(context, LegalLinks.privacyPolicyUrl),
           ),
           ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('利用規約'),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () =>
-                launchExternalUrl(context, LegalLinks.termsOfServiceUrl),
-          ),
-          ListTile(
             leading: const Icon(Icons.delete_outline),
             title: const Text('データ削除のお問い合わせ'),
-            trailing: const Icon(Icons.mail_outline, size: 18),
-            onTap: () => launchMailto(
-              context,
-              LegalLinks.dataDeletionEmail,
-              subject: 'データ削除のお問い合わせ',
-            ),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => launchExternalUrl(context, LegalLinks.contactFormUrl),
           ),
           const Divider(height: 1),
           const _VersionTile(),
