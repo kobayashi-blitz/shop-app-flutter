@@ -116,6 +116,7 @@ class _TodayDeliveryCompletedListScreenState
       itemBuilder: (context, index) {
         final item = _items[index];
         return DeliveryListTile(
+          key: ValueKey(item.id), // 受付ID でカード識別（合積みで同一 haisou_id が複数並ぶため）
           item: item,
           detailMode: DeliveryDetailMode.completed,
         );

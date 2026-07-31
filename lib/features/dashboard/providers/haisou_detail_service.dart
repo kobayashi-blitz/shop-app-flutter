@@ -10,7 +10,11 @@ class HaisouDetailService {
 
   HaisouDetailService(this._apiClient);
 
-  /// 1 配送 (`hs1.haisou_id`) の詳細を pcw `haisou/detail` から取得する。
+  /// 1 受付 (`hs3.tbl_id`) の詳細を pcw `haisou/detail` から取得する。
+  ///
+  /// 合積み配送（1 配送に複数受付）で対象受付を一意化するため、[haisouId] に加えて
+  /// [orderId] (= 受付ID = 一覧の primary_id) と [kubun] (生コード '1'〜'5') を必ず両方送る。
+  /// `order_id` だけでは種別跨ぎで tbl_id が衝突しうるため、サーバは `kubun` 併用時のみ確実に一意化する。
   ///
   /// shop_id 不一致 / 該当配送なしは pcw 側で `result: '2'` を返し、
   /// Service 層では **例外を throw** する (Provider 側で state.error に詰める)。
@@ -19,6 +23,8 @@ class HaisouDetailService {
     required int shopId,
     required int tantoId,
     required int haisouId,
+    required int orderId,
+    required String kubun,
   }) async {
     final Response res;
     try {
@@ -28,6 +34,8 @@ class HaisouDetailService {
           'shop_id': shopId,
           'tanto_id': tantoId,
           'haisou_id': haisouId,
+          'order_id': orderId,
+          'kubun': kubun,
         },
       );
     } on DioException catch (e) {

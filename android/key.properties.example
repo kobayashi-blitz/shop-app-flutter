@@ -1,0 +1,14 @@
+# Android リリース署名の設定テンプレート。
+# これをコピーして android/key.properties を作成し、実値を記入する。
+#   cp android/key.properties.example android/key.properties
+# ⚠️ key.properties と *.jks は .gitignore 済み。絶対にコミットしないこと。
+# ⚠️ storeFile は「絶対パス」で記載（~ は Gradle で展開されない）。
+
+# keytool で生成した keystore の絶対パス
+storeFile=/Users/shinyakobayashi/keys/shop-app-upload.jks
+# keystore（ストア）のパスワード
+storePassword=__CHANGE_ME__
+# 鍵エイリアス（keytool の -alias と一致）
+keyAlias=upload
+# 鍵のパスワード
+keyPassword=__CHANGE_ME__

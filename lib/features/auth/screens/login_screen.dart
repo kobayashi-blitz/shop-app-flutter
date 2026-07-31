@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/legal_links.dart';
 import '../../../core/notifications/push_notification_service.dart';
+import '../../../core/utils/external_launch.dart';
 import '../providers/auth_provider.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 
@@ -56,28 +58,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
-                    Icons.wheelchair_pickup,
-                    size: 80,
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'アプリタイトル',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'primeeからid,passを設定します',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.grey,
-                    ),
+                  Image.asset(
+                    'assets/images/primee_plus_logo.png',
+                    height: 140,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 48),
                   TextFormField(
@@ -157,6 +141,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'ログイン',
                             style: TextStyle(fontSize: 16),
                           ),
+                  ),
+                  const SizedBox(height: 24),
+                  // アカウント発行導線（自己登録は無く、運営が発行する運用）。
+                  Text(
+                    'ログインID・パスワードは運営より発行されます。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: authState.isLoading
+                        ? null
+                        : () => launchExternalUrl(
+                              context,
+                              LegalLinks.contactFormUrl,
+                            ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('アカウント発行のお問い合わせ'),
                   ),
                 ],
               ),
