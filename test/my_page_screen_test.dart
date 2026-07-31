@@ -15,7 +15,7 @@ void main() {
     // _VersionTile の PackageInfo.fromPlatform() をモック。
     PackageInfo.setMockInitialValues(
       appName: 'shop_app_flutter',
-      packageName: 'com.careershop.shop_app_flutter',
+      packageName: 'com.primecarewest.primeeplus',
       version: '1.0.0',
       buildNumber: '1',
       buildSignature: '',
