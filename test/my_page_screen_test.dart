@@ -31,12 +31,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('情報セクションの各項目が表示される', (tester) async {
+  testWidgets('情報セクションが表示され、利用規約は表示されない', (tester) async {
     await pumpScreen(tester);
 
     expect(find.text('マイページ'), findsOneWidget); // AppBar
     expect(find.text('プライバシーポリシー'), findsOneWidget);
-    expect(find.text('利用規約'), findsOneWidget);
+    // 利用規約は v1 では用意しないため導線を出さない。
+    expect(find.text('利用規約'), findsNothing);
     expect(find.text('データ削除のお問い合わせ'), findsOneWidget);
     expect(find.text('バージョン'), findsOneWidget);
   });

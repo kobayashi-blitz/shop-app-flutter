@@ -155,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ? null
                         : () => launchExternalUrl(
                               context,
-                              LegalLinks.accountRequestUrl,
+                              LegalLinks.contactFormUrl,
                             ),
                     icon: const Icon(Icons.open_in_new, size: 16),
                     label: const Text('アカウント発行のお問い合わせ'),
