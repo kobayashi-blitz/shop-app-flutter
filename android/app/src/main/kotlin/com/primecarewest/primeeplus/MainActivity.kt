@@ -1,4 +1,4 @@
-package com.careershop.shop_app_flutter
+package com.primecarewest.primeeplus
 
 import io.flutter.embedding.android.FlutterActivity
 

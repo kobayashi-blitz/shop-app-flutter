@@ -20,7 +20,7 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.careershop.shop_app_flutter"
+    namespace = "com.primecarewest.primeeplus"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -36,8 +36,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.careershop.shop_app_flutter"
+        // Play Console 登録済み。初回アップロード後は変更不可。
+        applicationId = "com.primecarewest.primeeplus"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23 // firebase_core/messaging が minSdk 23 必須 (Flutter 既定 21 では不可)
