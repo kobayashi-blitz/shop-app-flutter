@@ -94,7 +94,12 @@ String formatPlaceDelivery(String raw, {String emptyPlaceholder = '-'});
   - `formatPlaceDelivery`: `代理店` → `御社` / `代理店 `（末尾空白）→ `御社` / `利用者宅` → `利用者宅`（素通し）/ `プライムケアウエスト` → 素通し / 空 → `-`
 - `test/delivery_detail_screen_test.dart`（新規）
   - `ProviderScope` で `haisouDetailProvider(key)` を override し、`riyosyaName: '佐藤 雄子'` / `placeDelivery: '代理店'` / `haisouTantoTel: '090-9999-0000'` のダミー `HaisouDetail` を返す
-  - 検証: `佐藤 雄子 様` が表示される / `御社` が表示される / **`090-9999-0000` および `電話番号` が画面に存在しない** / `発信` ボタンが存在する
+  - 検証: `佐藤 雄子 様` が表示される / `御社` が表示される / **配送員の番号 `090-9999-0000` が画面に存在しない** / `発信` ボタンが存在する
+  - 注: 「電話番号」ラベルは **利用者カード側に残る**（消すのは担当カードの配送員番号だけ）ため、
+    `find.text('電話番号')` は `findsOneWidget`、利用者の番号は表示されたままであることも併せて検証する
+  - 番号未登録 (`haisouTantoTel: ''`) のとき発信ボタンが出ないケースも検証する
+  - `ElevatedButton.icon` は private サブクラスを返し `find.byType(ElevatedButton)` で拾えないため、
+    ボタンの検出はラベル `発信` と `Icons.call` で行う
   - `_TantoPhoto` は URL 空でプレースホルダになるようダミーを空文字にし、`Image.network` をテストで叩かない
 
 既存の `test/haisou_detail_test.dart` / `test/haisou_detail_service_test.dart` はモデル・通信層のテストで、
@@ -108,8 +113,12 @@ String formatPlaceDelivery(String raw, {String emptyPlaceholder = '-'});
 
 ## 検証手順
 
-1. `flutter analyze`
-2. `flutter test`
+本プロジェクトは fvm で Flutter 3.29.3 に固定されている (`.fvmrc`)。
+シェル既定の `flutter` は 3.22.2 で `firebase_core` の SDK 制約を満たさず `pub get` が失敗するため、
+**必ず `fvm flutter` を使う**こと。
+
+1. `fvm flutter analyze`
+2. `fvm flutter test`
 3. 実機/エミュレータで配送予定一覧 → 詳細を開き、3 点の表示を目視確認
 
 ## リスク
