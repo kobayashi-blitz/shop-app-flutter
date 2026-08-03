@@ -40,5 +40,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- FCM のバックグラウンド受信（pcw が content-available を送る場合）に必要。
+	     バックグラウンドフェッチは行わないため fetch は入れない。 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!-- 独自の暗号化を実装しておらず OS 標準の TLS のみを使うため輸出規制の免除対象。
+	     TestFlight アップロード時の輸出コンプライアンス質問を省略する。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
