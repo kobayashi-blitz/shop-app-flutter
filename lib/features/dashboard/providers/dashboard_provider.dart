@@ -8,10 +8,24 @@ final riyojokyoServiceProvider = Provider<RiyojokyoService>((ref) {
   return RiyojokyoService(apiClient);
 });
 
-/// 配送予定カードの表示対象日: 17 時を境に切替。
-/// 配送業務で午後遅くなったら翌日分に意識が向く運用に合わせる。
+/// 配送予定カードの表示対象日を翌日に切り替える時刻（端末ローカル時刻）。
+///
+/// pcw の配送予定 Push 送信（20:00 / `app/Console/Kernel.php`）より手前に置き、
+/// 通知を受けて開いた時点で一覧が既に翌日を向いているようにする。
+const _scheduledSwitchHour = 19;
+const _scheduledSwitchMinute = 55;
+
+/// 配送予定カードの表示対象日: 19:55 を境に切替。
+/// 配送業務で夕方以降は翌日分に意識が向く運用に合わせる。
 DateTime resolveScheduledTargetDate(DateTime now) {
-  return now.hour < 17 ? now : now.add(const Duration(days: 1));
+  final switchAt = DateTime(
+    now.year,
+    now.month,
+    now.day,
+    _scheduledSwitchHour,
+    _scheduledSwitchMinute,
+  );
+  return now.isBefore(switchAt) ? now : now.add(const Duration(days: 1));
 }
 
 /// 配送完了カードの表示対象日: 常に当日（time of day で変えない）
@@ -79,7 +93,6 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
       // shopId は既に int 型として保持されている（null の場合はエラー扱い）
       final parsedShopId = loginUser?.shopId;
-      print('### [DashboardNotifier] parsedShopId = $parsedShopId');
       if (parsedShopId == null) {
         state = state.copyWith(
           isLoading: false,

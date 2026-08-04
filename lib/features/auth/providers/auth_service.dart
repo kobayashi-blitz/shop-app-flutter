@@ -13,8 +13,8 @@ class AuthService {
 
   Future<User> login(String loginId, String password) async {
     try {
-      debugPrint('### [AuthService] login start: loginId=$loginId');
-
+      // ログイン ID は認証情報なのでログに出さない (`.claude/rules/security.md`)。
+      // debugPrint はリリースビルドでも出力されるため、開発用でも残さない。
       final response = await _apiClient.post(
         '/api/pcwMobileApi/shop/login',
         data: {

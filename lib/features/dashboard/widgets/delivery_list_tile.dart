@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/display_format.dart';
 import '../models/tomorrow_delivery_item.dart';
 import '../screens/delivery_detail_screen.dart';
 
@@ -94,9 +95,9 @@ class DeliveryListTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // 利用者名
+            // 利用者名 (敬称付き)。未登録時は詳細画面と違い空欄のまま (既存挙動を維持)。
             Text(
-              item.customerName,
+              formatRiyosyaName(item.customerName, emptyPlaceholder: ''),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -115,7 +116,7 @@ class DeliveryListTile extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    item.placeDelivery.isEmpty ? '-' : item.placeDelivery,
+                    formatPlaceDelivery(item.placeDelivery),
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade800,

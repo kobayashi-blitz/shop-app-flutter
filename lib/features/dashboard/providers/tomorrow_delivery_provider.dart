@@ -35,7 +35,7 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
   TomorrowDeliveryNotifier(this._service, this._ref)
       : super(TomorrowDeliveryState());
 
-  /// [targetDate] は呼出元 (画面) で確定済みの対象日。17 時切替ロジックの単一ソース化のため、
+  /// [targetDate] は呼出元 (画面) で確定済みの対象日。19:55 切替ロジックの単一ソース化のため、
   /// 内部で `DateTime.now()` を見ない（境界跨ぎで画面タイトルと API フィルタがズレないように）。
   Future<void> load({required DateTime targetDate}) async {
     state = state.copyWith(isLoading: true, error: null);
