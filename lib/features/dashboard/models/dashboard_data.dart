@@ -49,7 +49,7 @@ class UserInfo {
 
 class DeliveryInfo {
   /// 「配送予定」カードの件数。表示対象日は [scheduledTargetDate]
-  /// （17 時切替: 16:59 まで今日、17:00 から翌日）。
+  /// （19:55 切替: 19:54 まで今日、19:55 から翌日）。
   final int tomorrowScheduledCount;
 
   /// 「配送完了」カードの件数。表示対象日は [completedTargetDate]（常に当日）。
@@ -57,7 +57,7 @@ class DeliveryInfo {
   /// 預入系のみ r31.updated_at で代用の近似）。
   final int completedTodayCount;
 
-  /// 配送予定カードのタイトルに表示する日付（17 時を境に切替）
+  /// 配送予定カードのタイトルに表示する日付（19:55 を境に切替）
   final DateTime scheduledTargetDate;
 
   /// 配送完了カードのタイトルに表示する日付（常に当日）

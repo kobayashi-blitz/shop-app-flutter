@@ -14,7 +14,7 @@ class TomorrowDeliveryService {
   ///
   /// pcw 側は今日〜翌日両方を返すので、クライアント側で `kibou_date == YMD` フィルタ。
   /// [targetDate] は呼出元 (画面または provider) で `dashboard_data.scheduledTargetDate`
-  /// から確定済みの値を渡す（17 時切替ロジックの単一ソース化）。
+  /// から確定済みの値を渡す（19:55 切替ロジックの単一ソース化）。
   ///
   /// 異常 (DioException, result != '1') は **例外を throw**。Provider 側で
   /// state.error に詰めて UI に表示する。
