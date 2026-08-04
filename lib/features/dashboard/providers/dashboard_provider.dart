@@ -79,7 +79,6 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
       // shopId は既に int 型として保持されている（null の場合はエラー扱い）
       final parsedShopId = loginUser?.shopId;
-      print('### [DashboardNotifier] parsedShopId = $parsedShopId');
       if (parsedShopId == null) {
         state = state.copyWith(
           isLoading: false,
