@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/display_format.dart';
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/tyoki_demo_item.dart';
 import '../providers/dashboard_provider.dart';
@@ -196,8 +196,9 @@ class _TyokiDemoListScreenState extends ConsumerState<TyokiDemoListScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    formatRiyosyaName(item.riyosyaName, emptyPlaceholder: ''),
+                  child: RiyosyaNameText(
+                    name: item.riyosyaName,
+                    emptyPlaceholder: '',
                     style: nameStyle,
                     overflow: TextOverflow.ellipsis,
                   ),

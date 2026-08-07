@@ -5,14 +5,30 @@
 /// (`.claude/rules/architecture.md`「キー名 / 値は pcw に合わせる」)。
 library;
 
+/// 利用者に付ける敬称。表示側で使い回すため定数化する。
+const String riyosyaHonorific = '様';
+
+/// 利用者名を trim して返す。未登録 (空文字 / 空白のみ) なら null。
+///
+/// 「利用者名が未登録か」の判定はここに一本化する。文字列版 [formatRiyosyaName] と
+/// ウィジェット版 `RiyosyaNameText` で判定がズレると、「(氏名未登録) 様」のような
+/// 表示が片方だけで起きうるため。
+String? trimmedRiyosyaNameOrNull(String raw) {
+  final name = raw.trim();
+  return name.isEmpty ? null : name;
+}
+
 /// 利用者名に敬称「様」を付ける。
 ///
 /// 未登録 (空文字 / 空白のみ) のときは敬称を付けず [emptyPlaceholder] を返す。
 /// 一覧カードのように「空なら何も出さない」箇所では `emptyPlaceholder: ''` を渡す。
+///
+/// 敬称のフォントサイズを氏名より小さくしたい表示箇所では、この文字列版ではなく
+/// `RiyosyaNameText` ウィジェットを使う (文字ごとにサイズを変えられないため)。
 String formatRiyosyaName(String raw, {String emptyPlaceholder = '-'}) {
-  final name = raw.trim();
-  if (name.isEmpty) return emptyPlaceholder;
-  return '$name 様';
+  final name = trimmedRiyosyaNameOrNull(raw);
+  if (name == null) return emptyPlaceholder;
+  return '$name $riyosyaHonorific';
 }
 
 /// 引渡し場所の表示名。

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/display_format.dart';
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../models/sinsei_models.dart';
 import '../providers/sinsei_provider.dart';
 
@@ -360,8 +360,9 @@ class _NyuinHoryuSinseiCreateScreenState
             const Text('ご利用者名',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 4),
-            Text(
-              buildRiyosyaDisplayName(name: name, kana: kana),
+            RiyosyaNameText(
+              name: buildRiyosyaNameBase(name: name, kana: kana),
+              emptyPlaceholder: '',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -708,20 +709,19 @@ String _firstNonBlank(String primary, String? fallback) {
   return (fallback ?? '').trim();
 }
 
-/// 入院保留申請 作成画面のヘッダに出す利用者名。ふりがなを併記し敬称を付ける。
+/// 入院保留申請 作成画面のヘッダに出す利用者名の**基底文字列**（敬称は含まない）。
 ///
-/// - 氏名 + ふりがな → `さとう ゆうこ（佐藤 雄子） 様`
-/// - 氏名のみ        → `佐藤 雄子 様`
-/// - ふりがなのみ    → `さとう ゆうこ 様`（`さとう ゆうこ（） 様` を作らない）
-/// - 両方空          → 空文字（この画面は従来から空欄表示のため `-` にしない）
+/// - 氏名 + ふりがな → `さとう ゆうこ（佐藤 雄子）`
+/// - 氏名のみ        → `佐藤 雄子`
+/// - ふりがなのみ    → `さとう ゆうこ`（`さとう ゆうこ（）` を作らない）
+/// - 両方空          → 空文字
 ///
-/// 敬称の付与自体は [formatRiyosyaName] に委譲し、ロジックを一本化する。
+/// 敬称「様」の付与とフォントサイズ調整は [RiyosyaNameText] が行う。
 /// 画面から切り出してあるのは単体テストで境界を固定するため。
-String buildRiyosyaDisplayName({required String name, required String kana}) {
+String buildRiyosyaNameBase({required String name, required String kana}) {
   final n = name.trim();
   final k = kana.trim();
-  final combined = n.isEmpty ? k : (k.isEmpty ? n : '$k（$n）');
-  return formatRiyosyaName(combined, emptyPlaceholder: '');
+  return n.isEmpty ? k : (k.isEmpty ? n : '$k（$n）');
 }
 
 class _EmptyHoryuRow extends StatelessWidget {
