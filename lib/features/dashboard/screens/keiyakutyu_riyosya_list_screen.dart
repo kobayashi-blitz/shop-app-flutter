@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/utils/display_format.dart';
 import '../../sinsei/screens/nyuin_horyu_sinsei_create_screen.dart';
 import '../models/keiyakutyu_riyosya_item.dart';
 import '../providers/dashboard_provider.dart';
@@ -430,7 +431,10 @@ class _KeiyakutyuRiyosyaListScreenState
                 children: [
                   Expanded(
                     child: Text(
-                      group.riyosyaName,
+                      // 敬称は表示のみ。検索 (_matches) / ソート / 子画面への
+                      // 引数は生値のまま扱う。
+                      formatRiyosyaName(group.riyosyaName,
+                          emptyPlaceholder: ''),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/display_format.dart';
 import '../models/sinsei_models.dart';
 import '../providers/sinsei_provider.dart';
 
@@ -341,12 +342,10 @@ class _NyuinHoryuSinseiCreateScreenState
   }
 
   Widget _buildHeaderCard(SinseiCreateData data) {
-    final name = data.riyosyaName.isNotEmpty
-        ? data.riyosyaName
-        : (widget.riyosyaName ?? '');
-    final kana = data.riyosyaKana.isNotEmpty
-        ? data.riyosyaKana
-        : (widget.riyosyaKana ?? '');
+    // trim してから存否を判定する。空白のみの値を「あり」と誤判定して
+    // 引数側の正しい氏名へのフォールバックを塞がないようにする。
+    final name = _firstNonBlank(data.riyosyaName, widget.riyosyaName);
+    final kana = _firstNonBlank(data.riyosyaKana, widget.riyosyaKana);
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -362,7 +361,7 @@ class _NyuinHoryuSinseiCreateScreenState
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 4),
             Text(
-              kana.isEmpty ? name : '$kana（$name）',
+              buildRiyosyaDisplayName(name: name, kana: kana),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
@@ -697,6 +696,32 @@ class _NyuinHoryuSinseiCreateScreenState
       ),
     );
   }
+}
+
+/// [primary] を trim して非空ならそれを、そうでなければ [fallback] を trim して返す。
+///
+/// `isNotEmpty` だけだと空白のみの値を「あり」と判定してしまい、
+/// 遷移元から渡された正しい氏名へのフォールバックが効かなくなる。
+String _firstNonBlank(String primary, String? fallback) {
+  final p = primary.trim();
+  if (p.isNotEmpty) return p;
+  return (fallback ?? '').trim();
+}
+
+/// 入院保留申請 作成画面のヘッダに出す利用者名。ふりがなを併記し敬称を付ける。
+///
+/// - 氏名 + ふりがな → `さとう ゆうこ（佐藤 雄子） 様`
+/// - 氏名のみ        → `佐藤 雄子 様`
+/// - ふりがなのみ    → `さとう ゆうこ 様`（`さとう ゆうこ（） 様` を作らない）
+/// - 両方空          → 空文字（この画面は従来から空欄表示のため `-` にしない）
+///
+/// 敬称の付与自体は [formatRiyosyaName] に委譲し、ロジックを一本化する。
+/// 画面から切り出してあるのは単体テストで境界を固定するため。
+String buildRiyosyaDisplayName({required String name, required String kana}) {
+  final n = name.trim();
+  final k = kana.trim();
+  final combined = n.isEmpty ? k : (k.isEmpty ? n : '$k（$n）');
+  return formatRiyosyaName(combined, emptyPlaceholder: '');
 }
 
 class _EmptyHoryuRow extends StatelessWidget {

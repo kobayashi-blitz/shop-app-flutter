@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/utils/display_format.dart';
 import '../models/riyosya_syokai_item.dart';
 import '../providers/dashboard_provider.dart';
 import 'riyosya_syokai_detail_screen.dart';
@@ -401,8 +402,9 @@ class _RiyosyaSyokaiListScreenState
   }
 
   Widget _buildGroupCard(_RiyosyaGroup group) {
+    // 敬称は表示のみ。検索 (_matches) / グループ生成は生値のまま扱う。
     final displayName =
-        group.riyosyaName.isEmpty ? '(氏名未登録)' : group.riyosyaName;
+        formatRiyosyaName(group.riyosyaName, emptyPlaceholder: '(氏名未登録)');
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
