@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/nyuin_horyu_item.dart';
 import '../providers/dashboard_provider.dart';
@@ -167,8 +168,9 @@ class _NyuinHoryuListScreenState extends ConsumerState<NyuinHoryuListScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              item.riyosyaName,
+            RiyosyaNameText(
+              name: item.riyosyaName,
+              emptyPlaceholder: '',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

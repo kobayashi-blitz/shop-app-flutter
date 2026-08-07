@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../models/riyosya_syokai_item.dart';
 
 /// 利用者照会 詳細画面。
@@ -14,11 +15,13 @@ class RiyosyaSyokaiDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final head = items.first;
-    final displayName =
-        head.riyosyaName.isEmpty ? '(氏名未登録)' : '${head.riyosyaName} 様';
     return Scaffold(
       appBar: AppBar(
-        title: Text(displayName),
+        // AppBar タイトルは M3 titleLarge (22pt)。敬称はその 2pt 下 (20pt) になる。
+        title: RiyosyaNameText(
+          name: head.riyosyaName,
+          emptyPlaceholder: '(氏名未登録)',
+        ),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),

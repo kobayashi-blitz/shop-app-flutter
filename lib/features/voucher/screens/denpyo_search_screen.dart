@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/denpyo_search_item.dart';
 import '../providers/voucher_provider.dart';
@@ -489,8 +490,9 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                item.riyosyaName.isEmpty ? '(利用者未設定)' : item.riyosyaName,
+              RiyosyaNameText(
+                name: item.riyosyaName,
+                emptyPlaceholder: '(利用者未設定)',
                 style:
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/utils/display_format.dart';
+import '../../../core/widgets/riyosya_name_text.dart';
 import '../models/haisou_detail.dart';
 import '../models/tomorrow_delivery_item.dart';
 import '../providers/haisou_detail_provider.dart';
@@ -178,7 +179,14 @@ class DeliveryDetailScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _InfoRow(label: '利用者', value: formatRiyosyaName(d.riyosyaName)),
+          _InfoRow(
+            label: '利用者',
+            // 敬称を氏名より小さく出すため文字列ではなくウィジェットで渡す。
+            valueWidget: RiyosyaNameText(
+              name: d.riyosyaName,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
           _InfoRow(
               label: '住所',
               value: d.riyosyaAddress.isEmpty ? '-' : d.riyosyaAddress),
@@ -453,7 +461,15 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({required this.label, required this.value});
+  /// [value] の代わりに任意のウィジェットを値側に描く場合に指定する。
+  /// (利用者名のように文字ごとにサイズを変える必要がある行で使う)
+  final Widget? valueWidget;
+
+  const _InfoRow({
+    required this.label,
+    this.value = '',
+    this.valueWidget,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -473,10 +489,11 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
+            child: valueWidget ??
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 14),
+                ),
           ),
         ],
       ),
