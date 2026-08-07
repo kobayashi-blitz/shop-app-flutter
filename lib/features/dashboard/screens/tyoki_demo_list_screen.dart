@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/display_format.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/tyoki_demo_item.dart';
 import '../providers/dashboard_provider.dart';
@@ -183,8 +184,7 @@ class _TyokiDemoListScreenState extends ConsumerState<TyokiDemoListScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color:
-              isOver90 ? Colors.red.shade200 : Colors.grey.withOpacity(0.2),
+          color: isOver90 ? Colors.red.shade200 : Colors.grey.withOpacity(0.2),
           width: isOver90 ? 1.2 : 1,
         ),
       ),
@@ -197,7 +197,7 @@ class _TyokiDemoListScreenState extends ConsumerState<TyokiDemoListScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    item.riyosyaName,
+                    formatRiyosyaName(item.riyosyaName, emptyPlaceholder: ''),
                     style: nameStyle,
                     overflow: TextOverflow.ellipsis,
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/display_format.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/monthly_order_item.dart';
 import '../providers/dashboard_provider.dart';
@@ -162,7 +163,7 @@ class _MonthlyOrderListScreenState
             ),
             const SizedBox(height: 6),
             Text(
-              item.riyosyaName,
+              formatRiyosyaName(item.riyosyaName, emptyPlaceholder: ''),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

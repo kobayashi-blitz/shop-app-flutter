@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/display_format.dart';
 import '../models/riyosya_syokai_item.dart';
 
 /// 利用者照会 詳細画面。
@@ -14,8 +15,9 @@ class RiyosyaSyokaiDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final head = items.first;
+    // 敬称の付与はヘルパーに一本化する (以前はここだけ手書きだった)。
     final displayName =
-        head.riyosyaName.isEmpty ? '(氏名未登録)' : '${head.riyosyaName} 様';
+        formatRiyosyaName(head.riyosyaName, emptyPlaceholder: '(氏名未登録)');
     return Scaffold(
       appBar: AppBar(
         title: Text(displayName),
