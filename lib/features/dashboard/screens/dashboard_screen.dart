@@ -146,7 +146,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final dashboardState = ref.watch(dashboardProvider);
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const _EnvBadge(),
@@ -214,6 +214,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             tabs: [
               Tab(text: '商品管理'),
               Tab(text: '利用状況'),
+              Tab(text: '特価商品'),
             ],
           ),
         ),
@@ -261,6 +262,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               _buildDeliveryTab(data),
               _buildUsageTab(data),
+              _buildTokkaSyohinTab(),
             ],
           ),
         ),
@@ -377,6 +379,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onTap: () => _navigateToPlaceholder('利用者照会'),
         ),
       ],
+    );
+  }
+
+  /// 特価商品タブ。機能は未実装のため COMING SOON のみ表示する。
+  /// 見た目は [PlaceholderScreen] に合わせる（あちらは Scaffold 込みの全画面用）。
+  Widget _buildTokkaSyohinTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.construction,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Coming Soon',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'この機能は現在開発中です',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -531,6 +567,9 @@ class _EnvBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final env = detectAppEnv();
+    // 本番接続時はバッジを出さない。Local / Test / Custom では接続先を取り違えないよう出し続ける
+    // （内部テストの release ビルドは Test 表示のままにしたいので、kReleaseMode では分岐しない）。
+    if (env == AppEnv.prod) return const SizedBox.shrink();
     final color = switch (env) {
       AppEnv.local => Colors.grey.shade600,
       AppEnv.test => Colors.orange.shade700,
