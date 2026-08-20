@@ -48,7 +48,7 @@ class VoucherService {
   Future<DenpyoSearchResult> searchDenpyo({
     required int shopId,
     required List<String> denpyoSyurui,
-    String? hakkoubi, // YYYY-MM-DD or YYYY-MM
+    String? hakkoubi, // YYYY/MM/DD or YYYY/MM (pcw はスラッシュ区切りで書式判別)
     int page = 1,
     int perPage = 20,
   }) async {

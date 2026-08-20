@@ -61,8 +61,12 @@ class _DenpyoSearchScreenState extends ConsumerState<DenpyoSearchScreen> {
       throw Exception('ログイン情報が取得できませんでした。');
     }
     final service = ref.read(voucherServiceProvider);
+    // pcw は区切り文字で書式を判別する (MyBaseController::setWhereDateYmOrYmd)。
+    // スラッシュ区切りでないと %Y/%m 扱いになり、DATE_FORMAT(...) = '2026-08-19' の
+    // ような絶対に一致しない比較になって常に 0 件が返る (エラーにはならない)。
+    // 表示側 (_buildFiltersCollapsible) と同じ yyyy/MM/dd で送ること。
     final hakkoubi =
-        _hakkoubi == null ? null : DateFormat('yyyy-MM-dd').format(_hakkoubi!);
+        _hakkoubi == null ? null : DateFormat('yyyy/MM/dd').format(_hakkoubi!);
     final res = await service.searchDenpyo(
       shopId: shopId,
       denpyoSyurui: _selectedTypes.toList(),
