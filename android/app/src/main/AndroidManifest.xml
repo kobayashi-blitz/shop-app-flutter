@@ -1,6 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
     <!-- FCM 通知表示 (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- open_filex が自身のマニフェストで宣言する写真/動画/音声/外部ストレージ権限を除去する。
+         当アプリの open_filex 利用は PDF を開く 1 箇所のみ (lib/core/utils/pdf_opener.dart) で、
+         保存先は getTemporaryDirectory() = アプリ専用キャッシュ。FileProvider の content:// 経由で
+         開くため、これらの権限は不要。宣言したままだと Play の写真と動画の権限ポリシーに抵触する。 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
