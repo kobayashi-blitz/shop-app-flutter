@@ -61,9 +61,14 @@ class VoucherService {
     if (hakkoubi != null && hakkoubi.isNotEmpty) {
       body['search_hakkoubi'] = hakkoubi;
     }
+    // pcw 側の union クエリが重く、本番では 0 件でも 31〜35 秒かかる
+    // (2026-08-20 実測。日付で絞っても変わらないため結果件数に依存しない全走査型)。
+    // 共通の receiveTimeout 30 秒では必ず超過して失敗するため、この API だけ延長する。
+    // 根本原因はサーバ側のクエリ性能で、pcw 側の改善が入れば戻してよい。
     final res = await _apiClient.post(
       '/api/pcwMobileApi/shop/denpyo/search',
       data: body,
+      options: Options(receiveTimeout: const Duration(seconds: 120)),
     );
     final data = _asMap(res.data);
     if (data['result'] != '1') {
