@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/constants/legal_links.dart';
 import '../../../core/notifications/push_notification_service.dart';
-import '../../../core/utils/external_launch.dart';
 import '../providers/auth_provider.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 
@@ -143,22 +141,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                   ),
                   const SizedBox(height: 24),
-                  // アカウント発行導線（自己登録は無く、運営が発行する運用）。
+                  // 自己登録は無く、運営がアカウントを発行する運用であることの案内。
+                  // ここに問い合わせフォームへの外部リンクを置いていたが、App Store の
+                  // Guideline 3.1.1 (外部の購入導線とみなされた) で 2026-08-24 に
+                  // リジェクトされたため削除した。再追加しないこと。
+                  // ガードとして test/login_screen_test.dart がリンクの不在を検証している。
                   Text(
                     'ログインID・パスワードは運営より発行されます。',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 4),
-                  TextButton.icon(
-                    onPressed: authState.isLoading
-                        ? null
-                        : () => launchExternalUrl(
-                              context,
-                              LegalLinks.contactFormUrl,
-                            ),
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: const Text('アカウント発行のお問い合わせ'),
                   ),
                 ],
               ),
