@@ -62,12 +62,15 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
         targetDate: targetDate,
       );
 
+      // 取得中にログアウト・ログインし直すと、この Notifier は破棄されている。
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         items: items,
         error: null,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: e is Exception
@@ -81,6 +84,8 @@ class TomorrowDeliveryNotifier extends StateNotifier<TomorrowDeliveryState> {
 final tomorrowDeliveryProvider =
     StateNotifierProvider<TomorrowDeliveryNotifier, TomorrowDeliveryState>(
   (ref) {
+    // ログインし直したら作り直し、前の担当者の一覧を残さない。
+    ref.watch(authProvider.select((s) => s.user?.shopSyainId));
     final apiClient = ref.watch(apiClientProvider);
     final service = TomorrowDeliveryService(apiClient);
     return TomorrowDeliveryNotifier(service, ref);
