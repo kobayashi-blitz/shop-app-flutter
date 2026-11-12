@@ -96,6 +96,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     enabled: !authState.isLoading,
                   ),
                   const SizedBox(height: 24),
+                  // セッション切れ・アプリ更新後の再ログインの案内
+                  if (authState.notice != null && authState.error == null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              authState.notice!,
+                              style: TextStyle(color: Colors.blue.shade700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (authState.error != null)
                     Container(
                       padding: const EdgeInsets.all(12),

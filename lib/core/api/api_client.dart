@@ -1,8 +1,20 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../auth/token_storage.dart';
 
 class ApiClient {
   late final Dio _dio;
+  final TokenStorage _tokenStorage;
+  final StreamController<void> _unauthorized =
+      StreamController<void>.broadcast();
+
+  /// リクエストに付けたトークンを入れておく `RequestOptions.extra` のキー。
+  static const String _sentTokenKey = 'auth_token';
+
+  /// ログイン API。ここの 401 はセッション切れではないので通知しない。
+  static const String _loginPath = '/api/pcwMobileApi/shop/login';
 
   /// API 接続先 base URL。
   ///
@@ -19,35 +31,55 @@ class ApiClient {
     defaultValue: _defaultBaseUrl,
   );
 
-  ApiClient() {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ),
-    );
+  /// [dio] はテストで Adapter を差し替えるための入口。通常は省略する。
+  ApiClient({TokenStorage? tokenStorage, Dio? dio})
+      : _tokenStorage = tokenStorage ?? TokenStorage() {
+    _dio = dio ??
+        Dio(
+          BaseOptions(
+            baseUrl: baseUrl,
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 30),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          ),
+        );
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString('auth_token');
+          final token = await _tokenStorage.read();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
+            options.extra[_sentTokenKey] = token;
           }
           return handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401 &&
+              error.requestOptions.path != _loginPath) {
+            // ログインし直した後に、古いトークンで送ったリクエストの 401 が遅れて
+            // 届くことがある。今のトークンで送ったものだけをセッション切れとみなす。
+            final sent = error.requestOptions.extra[_sentTokenKey];
+            final current = await _tokenStorage.read();
+            if (sent != null && sent == current) {
+              _unauthorized.add(null);
+            }
+          }
           return handler.next(error);
         },
       ),
     );
   }
+
+  /// 今のトークンが 401 で拒否されたときに流れる。
+  ///
+  /// ログアウト処理は Provider の依存の外 (アプリのルート Widget) で受ける。
+  /// Provider の中から SessionController を読むと、
+  /// SessionController → Push → ApiClient と依存が循環するため。
+  Stream<void> get unauthorizedEvents => _unauthorized.stream;
 
   /// 汎用 POST メソッド
   ///
