@@ -21,7 +21,8 @@ if (hasReleaseKeystore) {
 
 android {
     namespace = "com.primecarewest.primeeplus"
-    compileSdk = flutter.compileSdkVersion
+    // Play は targetSdk 36 以上を要求する。Flutter 3.29.3 の既定値 (flutter.*) は 35 のため明示する。
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -40,8 +41,8 @@ android {
         applicationId = "com.primecarewest.primeeplus"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23 // firebase_core/messaging が minSdk 23 必須 (Flutter 既定 21 では不可)
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 24 // Play の自動保護が minSdk 24 以上を要求する (firebase_core/messaging は 23 以上)
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
