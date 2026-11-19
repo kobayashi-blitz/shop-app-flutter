@@ -77,6 +77,8 @@ class RentalUriageHistoryNotifier
         tantoId: tantoId,
       );
 
+      // 取得中にログアウト・ログインし直すと、この Notifier は破棄されている。
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         totalkinAll: res.totalkinAll,
@@ -86,6 +88,7 @@ class RentalUriageHistoryNotifier
         error: null,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: e is Exception
@@ -99,6 +102,8 @@ class RentalUriageHistoryNotifier
 final rentalUriageHistoryProvider = StateNotifierProvider<
     RentalUriageHistoryNotifier, RentalUriageHistoryState>(
   (ref) {
+    // ログインし直したら作り直し、前の担当者の売上を残さない。
+    ref.watch(authProvider.select((s) => s.user?.shopSyainId));
     final apiClient = ref.watch(apiClientProvider);
     final service = RentalUriageHistoryService(apiClient);
     return RentalUriageHistoryNotifier(service, ref);

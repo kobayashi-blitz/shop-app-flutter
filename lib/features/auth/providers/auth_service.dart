@@ -4,12 +4,43 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/auth/token_storage.dart';
 import '../../../core/models/user.dart';
+
+/// 起動時に端末に残っているログイン情報の判定結果。
+sealed class SessionCheck {
+  const SessionCheck();
+}
+
+/// トークンとログイン情報がそろっている。
+class SessionLoggedIn extends SessionCheck {
+  const SessionLoggedIn(this.user);
+  final User user;
+}
+
+/// ログインしていない。食い違って残っていた値は消してある。
+class SessionLoggedOut extends SessionCheck {
+  const SessionLoggedOut();
+}
+
+/// 旧版 (トークン導入前) でログインしたまま更新した。1 回だけ再ログインしてもらう。
+class SessionNeedsRelogin extends SessionCheck {
+  const SessionNeedsRelogin();
+}
 
 class AuthService {
   final ApiClient _apiClient;
+  final TokenStorage _tokenStorage;
 
-  AuthService(this._apiClient);
+  AuthService(this._apiClient, this._tokenStorage);
+
+  static const _prefKeys = [
+    'sp_shop_syain_id',
+    'sp_name',
+    'sp_shop_id',
+    'sp_shop_name',
+    'sp_login_id',
+  ];
 
   Future<User> login(String loginId, String password) async {
     try {
@@ -29,6 +60,12 @@ class AuthService {
         throw Exception('ログインIDまたはパスワードが正しくありません');
       }
 
+      // トークンが無いと担当者再登録などの API を使えないため、ログイン失敗として扱う。
+      final token = data['token'];
+      if (token is! String || token.isEmpty) {
+        throw Exception('ログインに失敗しました');
+      }
+
       final user = User(
         shopSyainId: (data['shop_syain_id'] as num).toInt(),
         shopSyainName: (data['shop_syain_name'] ?? '') as String,
@@ -37,6 +74,7 @@ class AuthService {
         shopName: data['shop_name'] as String?,
       );
 
+      await _tokenStorage.write(token);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('sp_shop_syain_id', user.shopSyainId.toString());
       await prefs.setString('sp_name', user.shopSyainName);
@@ -46,7 +84,7 @@ class AuthService {
 
       return user;
     } on DioException catch (e) {
-      debugPrint('### [AuthService] DioException: $e');
+      debugPrint('### [AuthService] DioException: ${e.type}');
       if (e.response != null) {
         throw Exception('ログインに失敗しました（HTTP ${e.response?.statusCode}）');
       }
@@ -57,37 +95,47 @@ class AuthService {
     }
   }
 
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('sp_shop_syain_id');
-    await prefs.remove('sp_name');
-    await prefs.remove('sp_shop_id');
-    await prefs.remove('sp_shop_name');
-    await prefs.remove('sp_login_id');
+  /// pcw 側で今のトークンを無効にする。失敗してもローカルのログアウトは続ける。
+  Future<void> logoutRemote() async {
+    try {
+      await _apiClient.post('/api/pcwMobileApi/shop/logout');
+    } catch (_) {}
   }
 
-  Future<User?> getCurrentUser() async {
+  /// 端末に保存したログイン情報とトークンを消す。
+  Future<void> clearSession() async {
+    await _tokenStorage.delete();
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('sp_shop_syain_id');
-    final userName = prefs.getString('sp_name');
-    final shopId = prefs.getString('sp_shop_id');
-    final shopName = prefs.getString('sp_shop_name');
-
-    if (userId != null && userName != null && shopId != null) {
-      return User(
-        shopSyainId: int.parse(userId),
-        shopSyainName: userName,
-        shopId: int.parse(shopId),
-        loginId: prefs.getString('sp_login_id') ?? '',
-        shopName: shopName ?? '',
-      );
+    for (final key in _prefKeys) {
+      await prefs.remove(key);
     }
-    return null;
   }
 
-  Future<bool> isLoggedIn() async {
+  Future<SessionCheck> checkSession() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('sp_shop_syain_id') != null;
+    final token = await _tokenStorage.read();
+    final userId = int.tryParse(prefs.getString('sp_shop_syain_id') ?? '');
+    final userName = prefs.getString('sp_name');
+    final shopId = int.tryParse(prefs.getString('sp_shop_id') ?? '');
+
+    if (token != null && userId != null && userName != null && shopId != null) {
+      return SessionLoggedIn(User(
+        shopSyainId: userId,
+        shopSyainName: userName,
+        shopId: shopId,
+        loginId: prefs.getString('sp_login_id') ?? '',
+        shopName: prefs.getString('sp_shop_name') ?? '',
+      ));
+    }
+    if (token == null && prefs.getString('sp_shop_syain_id') != null) {
+      return const SessionNeedsRelogin();
+    }
+    // iOS で入れ直した後の「Keychain のトークンだけ残っている」や、
+    // ログイン情報が一部だけ欠けている状態。残りを消して未ログインにそろえる。
+    if (token != null || _prefKeys.any(prefs.containsKey)) {
+      await clearSession();
+    }
+    return const SessionLoggedOut();
   }
 
   // pcw 側 Content-Type が text/html のため Dio が自動 JSON 化しない。文字列のときは手動 decode。

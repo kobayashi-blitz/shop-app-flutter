@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/env/app_env.dart';
-import '../../../core/notifications/push_notification_service.dart';
+import '../../auth/providers/session_controller.dart';
 import '../models/dashboard_data.dart';
 import '../providers/dashboard_provider.dart';
 import 'placeholder_screen.dart';
@@ -18,6 +18,9 @@ import 'rental_uriage_history_screen.dart';
 import 'riyosya_syokai_list_screen.dart';
 import '../../voucher/screens/voucher_hub_screen.dart';
 import '../../user/screens/my_page_screen.dart';
+import '../../tanto/screens/tanto_misettei_screen.dart';
+import '../../tanto/screens/tanto_saitoroku_screen.dart';
+import '../../tanto/tanto_labels.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -60,6 +63,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         MaterialPageRoute(
           builder: (_) => const TodayDeliveryCompletedListScreen(),
         ),
+      );
+      return;
+    }
+
+    if (title == TantoLabels.saitoroku) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TantoSaitorokuScreen()),
+      );
+      return;
+    }
+
+    if (title == TantoLabels.misettei) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TantoMisetteiScreen()),
       );
       return;
     }
@@ -192,13 +209,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 );
                 if (confirmed != true || !mounted) return;
 
-                // ログアウト前に FCM トークンを解除（shop_syain_id が prefs にあるうちに）
-                await ref
-                    .read(pushNotificationServiceProvider)
-                    .unregisterToken();
-                await ref.read(authProvider.notifier).logout();
+                // FCM 解除・pcw のトークン無効化・端末の保存値の削除まで行う
+                await ref.read(sessionControllerProvider).logout();
                 if (mounted) {
-                  navigator.pushReplacementNamed('/login');
+                  navigator.pushNamedAndRemoveUntil('/login', (_) => false);
                 }
               },
             ),
@@ -377,6 +391,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           icon: Icons.person_search,
           color: Colors.indigo,
           onTap: () => _navigateToPlaceholder('利用者照会'),
+        ),
+        const SizedBox(height: 8),
+        _buildTextActionRow(
+          title: TantoLabels.saitoroku,
+          icon: Icons.how_to_reg,
+          color: Colors.teal,
+          onTap: () => _navigateToPlaceholder(TantoLabels.saitoroku),
+        ),
+        const SizedBox(height: 8),
+        _buildTextActionRow(
+          title: TantoLabels.misettei,
+          icon: Icons.person_remove_outlined,
+          color: Colors.deepOrange,
+          onTap: () => _navigateToPlaceholder(TantoLabels.misettei),
         ),
       ],
     );

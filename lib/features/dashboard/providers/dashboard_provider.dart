@@ -125,6 +125,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         ),
         riyo.haisouKanryoCount(shopId: parsedShopId, tantoId: tantoId),
       ]);
+      // 取得中にログアウト・ログインし直すと、この Notifier は破棄されている。
+      if (!mounted) return;
 
       final dashboardData = DashboardData(
         user: UserInfo(
@@ -193,6 +195,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       });
     } catch (e) {
       // ここに来ることはほぼ無いが、念のためエラー処理を残しておく
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         rentalSalesLoading: false,
@@ -209,5 +212,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
+  // ログインし直したら作り直し、前の担当者の数値を残さない。
+  ref.watch(authProvider.select((s) => s.user?.shopSyainId));
   return DashboardNotifier(ref);
 });

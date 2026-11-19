@@ -42,6 +42,17 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  /// ログイン中だけ true。ログアウト処理の間とログイン前は、
+  /// トークン登録と通知タップでの画面移動を止める。
+  bool _active = false;
+
+  /// ログインが確定したら呼ぶ。
+  void resume() => _active = true;
+
+  /// ログアウト処理の最初に呼ぶ。解除の途中でトークン更新による再登録が走ったり、
+  /// ログイン画面に戻した後に通知タップで画面が開いたりしないようにする。
+  void suspend() => _active = false;
+
   /// アプリ起動後（認証解決後）に一度呼ぶ。許諾・チャネル作成・リスナ登録・トークン登録。
   Future<void> init() async {
     if (_initialized) return;
@@ -115,6 +126,7 @@ class PushNotificationService {
 
   /// ログイン直後に呼ぶ（`shop_syain_id` 確定後のトークン登録）。
   Future<void> onLoggedIn() async {
+    resume();
     final token = await _getFcmToken();
     if (token != null) await registerToken(token);
   }
@@ -130,6 +142,7 @@ class PushNotificationService {
 
   /// FCM トークンを pcw に登録（`shop_syain_id` と紐付け）。未ログイン時は no-op。
   Future<void> registerToken(String token) async {
+    if (!_active) return;
     final prefs = await SharedPreferences.getInstance();
     final shopSyainId = prefs.getString('sp_shop_syain_id');
     final shopId = prefs.getString('sp_shop_id');
@@ -151,21 +164,28 @@ class PushNotificationService {
   }
 
   /// ログアウト時：pcw からトークンを解除し、端末トークンも破棄。
+  ///
+  /// 失敗しても例外は投げない。ここで止まるとログアウトの残りの手順
+  /// (トークン・ログイン情報の削除) が実行されなくなるため。
   Future<void> unregisterToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final shopSyainId = prefs.getString('sp_shop_syain_id');
-    final token = await _getFcmToken();
-    if (shopSyainId != null && token != null) {
-      try {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shopSyainId = prefs.getString('sp_shop_syain_id');
+      final token = await _getFcmToken();
+      if (shopSyainId != null && token != null) {
         await _apiClient.post(
           '/api/pcwMobileApi/shop/device-token/unregister',
           data: {'shop_syain_id': int.tryParse(shopSyainId), 'token': token},
         );
-      } catch (e) {
-        debugPrint('### device-token unregister failed: $e');
       }
+    } catch (e) {
+      debugPrint('### device-token unregister failed: $e');
     }
-    await FirebaseMessaging.instance.deleteToken();
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (e) {
+      debugPrint('### FCM deleteToken failed: $e');
+    }
   }
 
   void _showForeground(RemoteMessage m) {
@@ -205,6 +225,7 @@ class PushNotificationService {
 
   /// payload `type` に応じて遷移（ナビゲータが既知＝認証完了後でのみ呼ばれる前提）。
   void _handleTap(Map<String, dynamic> data) {
+    if (!_active) return;
     final nav = navigatorKey.currentState;
     if (nav == null) return;
     switch (data['type']?.toString()) {
